@@ -28,10 +28,9 @@ someSignal init = scan (box (\n _ -> n + 25)) init everySecondSig
 -- Property to test if mapping the same function to the same signal gives the same result
 prop_naiveTest :: Int -> Bool
 prop_naiveTest initVal =
-  let signal = someSignal initVal -- Generate the signal once
+  let signal = someSignal initVal
       mapped = mapWithFunc2 someFunction signal -- Map the function over the signal
-      xFirstMapped = takeFirstN 10 mapped
-      res = take 10 xFirstMapped -- Take the first 10 results
+      res = take 10 mapped -- Trying to take the first 10 results, but we are not allowed to on Signal
    in all (\(x, n) -> n == (100 + initVal + (25 * x))) (zip [0 ..] res) -- Validate the transformation
 
 -- Main function to run the test

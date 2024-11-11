@@ -80,5 +80,6 @@ arbitrarySig clocks 0 = do
 arbitrarySig clocks n = do
   x <- arbitrary
   xs <- arbitrarySig clocks (n - 1) -- not evaluated yet, forced in InputValue
-  let later = Delay (IntSet.fromList clocks) (\_ -> xs)
+  -- y <- genElem
+  let later = Delay (IntSet.fromList clocks) (\_ -> xs) -- y instead of clocks
   return (x ::: later)

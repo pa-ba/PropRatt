@@ -2,6 +2,8 @@ module Name.Properties (
     prop_map_id,
     prop_map_associative,
     prop_map_size,
+    prop_map_id_Int,
+    prop_map_id_Float,
 ) where
 
 import AsyncRattus.Signal
@@ -30,8 +32,14 @@ import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith
 -- prop_map_id :: (Eq a, Arbitrary a, Show a) => Positive Int -> Sig a -> Bool
 -- prop_map_id (Positive n) sig = eqSig n (map (box id) sig) sig
 
-prop_map_id :: Sig Int -> Bool
+prop_map_id :: Eq a => Sig a -> Bool
 prop_map_id sig = sig == map (box id) sig
+
+prop_map_id_Int :: Sig Int -> Bool
+prop_map_id_Int = prop_map_id
+
+prop_map_id_Float :: Sig Float -> Bool
+prop_map_id_Float = prop_map_id
 
 -- 2.
 -- Property map is associative, f after g. map f sig (map g sig) == map (g . f) sig
@@ -48,7 +56,7 @@ prop_map_associative f sig = do
 
 
 prop_map_size :: Box (Int -> Int) -> Sig Int -> Bool
-prop_map_size f sig = 
+prop_map_size f sig =
     sizeSig sig 0 == sizeSig (map f sig) 0
 
 -- zip property ideas
@@ -57,10 +65,10 @@ prop_map_size f sig =
 -- zip with a constant empty signal is the signal itself
 -- hacky by making stable int. why do we need this
 
--- could not deduce stable type a
+-- -- could not deduce stable type a
 
 -- prop_zip_const :: (Eq a, Arbitrary a, Show a) => Box (a -> a -> a) -> Sig a -> Bool
--- prop_zip_const f sig = zipWith f sig (0 ::: never) == sig
+-- prop_zip_const sig = zip sig (0 ::: never) == sig
 
 -- 2.
 -- zip length increases with each tick of distinct streams by 2, except when they tick at the same time, in which case it only increases by one

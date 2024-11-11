@@ -1,6 +1,14 @@
 # PBT-for-AsyncRattus
 
 
+## Notes/questions before feedback session 22/10 11:00
+For this feedback session, we have been experimenting with a lot of AsyncRattus coding, especially working with creating an Arbitrary input generator for signals. We looked a bit into doing the same for clocks, and we a few questions we would like to discuss at the session. 
+Take a look at some of the code if you have time, and else, we will discuss and look at it wednesday :D 
+
+
+
+
+
 ## Notes/questions before feedback session 9/10 11:00
 We have tried to implement the map function, both in Rattus and AsyncRattus.
 In this repo, you find one folder for each example, namely rattusExample and asyncRattusExample.

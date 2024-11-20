@@ -1,11 +1,53 @@
 # PBT-for-AsyncRattus
 
 
+## Notes/questions before feedback session 21/11 12:30
+Hi there! Since last time we have mainly been working on implementing a method that compares two signals, and determines whether the second signal is a stuttering of the first signal.
+For doing this, we started by implementing a list based version. That is taking X elements of two signal and zipping these together. 
+The list based version might not be the way to go, because we then throw out the clock. Therefore we tried implementing a Signal based version, with a clock picking strategy
+of always picking the smallest possible clock. You can find the code for the two versions in `test/src/Name/Properties.hs` from line 63. 
+
+In the Main file (`test/src/Main.hs`) we have an example of calling our methods with arbitrarily generated Signals. This is currently limited to Signals of length 3, to test simple examples. Running `stack run` from the root of `test` folder should print; two arbitrary signals, the zipped tuple representation of them, the stutter signal and a boolean indicating whether the zipped and stripped signal is a stuttering of the first original signal.
+
+This works to some extend, but we encountered a bug that only happens in some cases. When zipping two Signals with the zip method from AsyncRattus (we do that in here: `test/src/Name/ARat.hs`) we do in some cases get tuples where it contains elements that are not a part of either of the two initial signals. 
+Below is examples of different output we get. The results here are structered as: `Signal1, Signal2, ZippedSignal, StutterSignal, IsStuttering bool`
+
+A correct result. We advance on smallest clock 1, so we don't zip crooked
+```
+Sig [-21,24,-20] clock: fromList [2,3]
+Sig [-21,-13,-20] clock: fromList [2]
+Sig [(-21 :* -21),(24 :* -13),(-20 :* -20)] clock: fromList [2,3]
+Sig [-21,24,-20] clock: fromList [2,3]
+True
+```
+
+A correct result. We advance on smallest clock, which is 3 in the first signal and 1 in the second. This results in a crooked zipping, and we get a correct stuttering of the original signal.
+```
+Sig [16,0,-16] clock: fromList [2]
+Sig [-14,-12,-12] clock: fromList [1]
+Sig [(16 :* -14),(16 :* -12),(16 :* -12),(16 :* -28),(0 :* -28),(-16 :* -28)] clock: fromList [1,2]
+Sig [16,16,16,16,0,-16] clock: fromList [1,2]
+True
+```
+
+This is the wrong/problematic case; A wrong result. We have different smallest clocks in each Signal, so we should have a crooked zipping. However, the last 3 tuples contains the value -7 in first position, which comes from neither of the two initial signals. 
+```
+Sig [9,9,-30] clock: fromList [1]
+Sig [-12,29,0] clock: fromList [2]
+Sig [(9 :* -12),(9 :* -12),(-30 :* -12),(17 :* -12),(17 :* 29),(17 :* 0)] clock: fromList [1,2]
+Sig [9,9,-30,17,17,17] clock: fromList [1,2]
+False
+```
+
+
+In the supervision session we would like to discuss whether we are going in the right direction with this, and if we are implementing somthing in a wrong way. 
+We would also like to discuss how we can solve the problem with the wrong case described above.
+
+
+
 ## Notes/questions before feedback session 22/10 11:00
 For this feedback session, we have been experimenting with a lot of AsyncRattus coding, especially working with creating an Arbitrary input generator for signals. We looked a bit into doing the same for clocks, and we a few questions we would like to discuss at the session. 
 Take a look at some of the code if you have time, and else, we will discuss and look at it wednesday :D 
-
-
 
 
 

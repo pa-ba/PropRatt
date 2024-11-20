@@ -1,6 +1,6 @@
-name:                rattusExample
+name:                test3
 version:             0.1.0.0
-github:              "githubuser/rattusExample"
+github:              "githubuser/test3"
 license:             BSD-3-Clause
 author:              "Author name here"
 maintainer:          "example@example.com"
@@ -17,11 +17,13 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/rattusExample#readme>
+description:         Please see the README on GitHub at <https://github.com/githubuser/test3#readme>
 
 dependencies:
 - base >= 4.7 && < 5
-- Rattus
+- QuickCheck
+- AsyncRattus
+- containers
 
 ghc-options:
 - -Wall
@@ -38,18 +40,18 @@ library:
   source-dirs: src
 
 executables:
-  rattusExample-exe:
+  test3-exe:
     main:                Main.hs
-    source-dirs:         app
+    source-dirs:         src
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - rattusExample
+    - test3
 
 tests:
-  rattusExample-test:
+  test3-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -57,4 +59,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - rattusExample
+    - test3

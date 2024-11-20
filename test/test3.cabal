@@ -4,11 +4,11 @@ cabal-version: 2.2
 --
 -- see: https://github.com/sol/hpack
 
-name:           asyncRattusExample
+name:           test3
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/asyncRattusExample#readme>
-homepage:       https://github.com/githubuser/asyncRattusExample#readme
-bug-reports:    https://github.com/githubuser/asyncRattusExample/issues
+description:    Please see the README on GitHub at <https://github.com/githubuser/test3#readme>
+homepage:       https://github.com/githubuser/test3#readme
+bug-reports:    https://github.com/githubuser/test3/issues
 author:         Author name here
 maintainer:     example@example.com
 copyright:      2024 Author name here
@@ -21,15 +21,19 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/asyncRattusExample
+  location: https://github.com/githubuser/test3
 
 library
   exposed-modules:
-      Lib
+      Main
+      Name.ARat
+      Name.Generators
+      Name.Properties
+      Name.Utilities
   other-modules:
-      Paths_asyncRattusExample
+      Paths_test3
   autogen-modules:
-      Paths_asyncRattusExample
+      Paths_test3
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
@@ -37,40 +41,44 @@ library
       AsyncRattus
     , QuickCheck
     , base >=4.7 && <5
-    , text
+    , containers
   default-language: Haskell2010
 
-executable asyncRattusExample-exe
+executable test3-exe
   main-is: Main.hs
   other-modules:
-      Paths_asyncRattusExample
+      Name.ARat
+      Name.Generators
+      Name.Properties
+      Name.Utilities
+      Paths_test3
   autogen-modules:
-      Paths_asyncRattusExample
+      Paths_test3
   hs-source-dirs:
-      app
+      src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       AsyncRattus
     , QuickCheck
-    , asyncRattusExample
     , base >=4.7 && <5
-    , text
+    , containers
+    , test3
   default-language: Haskell2010
 
-test-suite asyncRattusExample-test
+test-suite test3-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_asyncRattusExample
+      Paths_test3
   autogen-modules:
-      Paths_asyncRattusExample
+      Paths_test3
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       AsyncRattus
     , QuickCheck
-    , asyncRattusExample
     , base >=4.7 && <5
-    , text
+    , containers
+    , test3
   default-language: Haskell2010

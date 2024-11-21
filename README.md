@@ -30,12 +30,12 @@ Sig [16,16,16,16,0,-16] clock: fromList [1,2]
 True
 ```
 
-This is the wrong/problematic case; A wrong result. We have different smallest clocks in each Signal, so we should have a crooked zipping. However, the last 3 tuples contains the value -7 in first position, which comes from neither of the two initial signals. 
+This is the wrong/problematic case; A wrong result. We have different smallest clocks in each Signal, so we should have a crooked zipping. However, the last 3 tuples contains the value 0 in first position, which comes from neither of the two initial signals. 
 ```
-Sig [9,9,-30] clock: fromList [1]
-Sig [-12,29,0] clock: fromList [2]
-Sig [(9 :* -12),(9 :* -12),(-30 :* -12),(17 :* -12),(17 :* 29),(17 :* 0)] clock: fromList [1,2]
-Sig [9,9,-30,17,17,17] clock: fromList [1,2]
+Sig [-24,10,-16] clock: fromList [1,2]
+Sig [-29,-11,-8] clock: fromList [2]
+Sig [(-24 :* -29),(10 :* -29),(-16 :* -29),(0 :* -29),(0 :* -11),(0 :* -8)] clock: fromList [1,2]
+Sig [-24,10,-16,0,0,0] clock: fromList [1,2]
 False
 ```
 

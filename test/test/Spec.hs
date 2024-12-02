@@ -1,12 +1,6 @@
 import Test.QuickCheck
-import Name.Properties
-import Name.Utilities
-import Name.Generators
-
-prop_sig_size_non_negative :: Sig Int -> Bool
-prop_sig_size_non_negative sig = sizeSig sig 0 >= 0
-
+import Name.Properties (prop_sig_is_later_sig_after_tick_on_later_sig)
 
 main :: IO ()
 main = do
-    quickCheck (prop_zip_then_strip)
+    quickCheck prop_sig_is_later_sig_after_tick_on_later_sig

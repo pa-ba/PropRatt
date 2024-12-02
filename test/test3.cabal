@@ -26,7 +26,7 @@ source-repository head
 library
   exposed-modules:
       Main
-      Name.ARat
+      Name.AsyncRat
       Name.Generators
       Name.Properties
       Name.Utilities
@@ -47,7 +47,7 @@ library
 executable test3-exe
   main-is: Main.hs
   other-modules:
-      Name.ARat
+      Name.AsyncRat
       Name.Generators
       Name.Properties
       Name.Utilities

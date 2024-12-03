@@ -1,5 +1,12 @@
 # PBT-for-AsyncRattus
 
+## Notes/questions before feedback session 5/12 12:30
+Hi! Since last time, we have begun writing the report, as well as we have implemented property based testing for the zip and the switch method. 
+For the feedback session this thursday, we would like to talk about whether the current implementations are sufficient as basis for the research project. 
+For testing the switch method we are testing whether the result of calling the switch method is equal to the later signal initially passed to the switch method, when the clock on the later signal has ticked. 
+Is this test sufficient or should we test additional properties on the switch method?
+We would also like to talk about how much text we can have reviewed by you before handing in, and also talk about when the examination will take place.
+
 
 ## Notes/questions before feedback session 21/11 12:30
 Hi there! Since last time we have mainly been working on implementing a method that compares two signals, and determines whether the second signal is a stuttering of the first signal.

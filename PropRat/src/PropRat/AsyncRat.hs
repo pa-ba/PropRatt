@@ -6,7 +6,7 @@
 -- AsyncRattus code goes here. 
 -- The code is type checked by the AsyncRattus compiler plugin.
 
-module Name.AsyncRat (
+module PropRat.AsyncRat (
     aRatZip,
     aRatSwitch
 ) where
@@ -14,7 +14,7 @@ module Name.AsyncRat (
 import AsyncRattus.Signal
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
-import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith, switch)
+import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 
 aRatZip :: Sig Int -> Sig Int -> Sig (Int :* Int)
 aRatZip a b = zip a b

@@ -2,10 +2,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use const" #-}
 
--- Signals are orphaned because we want to export the implementation of the typeclasses.
--- Not ideal. Todo: possibly implement a Sig wrapper type.
-
-module Name.Generators
+module PropRat.Generators
   ( arbitrarySig,
     Sig (..),
   )
@@ -14,12 +11,14 @@ where
 import AsyncRattus.InternalPrimitives
 import AsyncRattus.Signal
 import qualified Data.IntSet as IntSet
-import Name.Utilities
+import PropRat.Utilities
 import Test.QuickCheck
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 
 instance (Arbitrary a) => Arbitrary (Sig a) where
-  arbitrary = arbitrarySig 5
+  arbitrary = do
+    len <- choose (1, 10000) -- Introduced a lower limit of Signals of length 1, because when deconstructing and finding a later signal, from an original signal of length 0, an error is thrown
+    arbitrarySig len
 
 instance (Show a) => Show (Sig a) where
   show (x ::: xs) = "Sig: " ++ show (takeSigAndClockExhaustive (x ::: xs))

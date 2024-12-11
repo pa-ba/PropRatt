@@ -11,7 +11,7 @@ module PropRat.Utilities (
     first,
     isStuttering,
     stuttering,
-    isTailEqualToLaterSignal,
+    isEventuallyEqual,
     getLater,
 ) where
 
@@ -41,6 +41,7 @@ takeSigExhaustive (x ::: Delay cl f) =
         [x]
     else x : takeSigExhaustive (f (InputValue (pickSmallestClock cl) ()))
 
+-- This is only used to print/visualise clocks for each element in a signal when testing
 takeSigAndClockExhaustive :: Sig a -> [(a, IntSet.IntSet)]
 takeSigAndClockExhaustive (x ::: Delay cl f) =
     if IntSet.null cl then
@@ -101,13 +102,13 @@ sigAEqualsSigB (x ::: Delay clx fx) (y ::: Delay cly fy)
     union = IntSet.union clx cly
     smallest = IntSet.findMin union
 
-isTailEqualToLaterSignal :: Sig Int -> O (Sig Int) -> Bool
-isTailEqualToLaterSignal (_ ::: Delay clx fx) (Delay cly fy)
+isEventuallyEqual :: Sig Int -> O (Sig Int) -> Bool
+isEventuallyEqual (_ ::: Delay clx fx) (Delay cly fy)
   | IntSet.null union = False
   | IntSet.member smallest cly =
       sigAEqualsSigB (fx (InputValue smallest ())) (fy (InputValue smallest ()))
   | IntSet.member smallest clx =
-      isTailEqualToLaterSignal (fx (InputValue smallest ())) (Delay cly fy)
+      isEventuallyEqual (fx (InputValue smallest ())) (Delay cly fy)
   | otherwise = False
   where
     union = IntSet.union clx cly

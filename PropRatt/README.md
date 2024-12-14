@@ -12,7 +12,7 @@ The following describes the folder structure of the project:
 │   │   │    ├── Properties.hs      // Property functions for the defined properties to test
 │   │   │    └── Utilities.hs       // All utility function used in the files above, such as checking stuttering or equality of signals
 │   │   │
-│   │   └── Main.hs                 // Main function for executing the tests on some arbitrary signals
+│   │   └── Main.hs                 // Main function for executing properties on a (sample) arbitrary signal for debugging.
 │   │
 │   └── test
 │       └── Spec.hs                 // QuickCheck test, executing 100 tests for each property with a wide range of different input signals

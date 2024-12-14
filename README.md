@@ -1,12 +1,12 @@
-# PropRat
+# PropRatt
 ## Property Based Testing for Functional Reactive Programming in AsyncRattus
 This project explores PBT for AsyncRattus.
 The following describes the folder structure of the project:
 
 ```
-├── PropRat
+├── PropRatt
 │   ├── src
-│   │   ├── PropRat
+│   │   ├── PropRatt
 │   │   │    ├── AsyncRat.hs        // Functions executed with the AsyncRattus compiler plugin enabled
 │   │   │    ├── Generators.hs      // Generator function for generating arbitrary signals and clocks
 │   │   │    ├── Properties.hs      // Property functions for the defined properties to test

@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use const" #-}
 
-module PropRat.Generators
+module PropRatt.Generators
   ( arbitrarySig,
     Sig (..),
   )
@@ -11,7 +11,7 @@ where
 import AsyncRattus.InternalPrimitives
 import AsyncRattus.Signal
 import qualified Data.IntSet as IntSet
-import PropRat.Utilities
+import PropRatt.Utilities
 import Test.QuickCheck
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 

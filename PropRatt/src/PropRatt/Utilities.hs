@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use const" #-}
-module PropRat.Utilities (
+module PropRatt.Utilities (
     takeSig,
     takeSigExhaustive,
     takeSigAndClockExhaustive,
@@ -13,6 +13,7 @@ module PropRat.Utilities (
     stuttering,
     isEventuallyEqual,
     getLater,
+    sigAEqualsSigB
 ) where
 
 import AsyncRattus.Strict

@@ -1,6 +1,6 @@
-name:                PropRat
+name:                PropRatt
 version:             0.1.0.0
-github:              "githubuser/PropRat"
+github:              "githubuser/PropRatt"
 license:             BSD-3-Clause
 author:              "Author name here"
 maintainer:          "example@example.com"
@@ -40,7 +40,7 @@ library:
   source-dirs: src
 
 executables:
-  PropRat-exe:
+  PropRatt-exe:
     main:                Main.hs
     source-dirs:         src
     ghc-options:
@@ -48,10 +48,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - PropRat
+    - PropRatt
 
 tests:
-  PropRat-test:
+  PropRatt-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -59,4 +59,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - PropRat
+    - PropRatt

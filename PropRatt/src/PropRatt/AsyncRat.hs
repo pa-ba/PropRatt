@@ -6,7 +6,7 @@
 -- AsyncRattus code goes here. 
 -- The code is type checked by the AsyncRattus compiler plugin.
 
-module PropRat.AsyncRat (
+module PropRatt.AsyncRat (
     aRatZip,
     aRatSwitch
 ) where

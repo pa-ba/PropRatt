@@ -1,9 +1,9 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 module Main (main) where
 import Test.QuickCheck
-import PropRat.AsyncRat
-import PropRat.Generators
-import PropRat.Properties
+import PropRatt.AsyncRat
+import PropRatt.Generators
+import PropRatt.Properties
 
 
 main :: IO ()
@@ -13,7 +13,7 @@ main = do
     laterSignal <- generate (arbitrary :: Gen (Sig Int))
     let later = getLater laterSignal
     let switched = aRatSwitch startSignal later
-    let switchedCorrectly = prop_sig_is_later_sig_after_tick_on_later_sig startSignal laterSignal
+    let switchedCorrectly = prop_eventual_equality startSignal laterSignal
     --putStrLn (show startSignal)
     --putStrLn (show laterSignal)
     --putStrLn (show switched)

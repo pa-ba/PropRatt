@@ -5,9 +5,11 @@
 module PropRatt.Properties
   ( 
     prop_is_stuttering,
+    prop_is_stuttering_failing,
     stuttering,
     prop_eventual_equality,
-    getLater,
+    prop_eventual_equality_failing,
+    getLater
   )
 where
 
@@ -44,6 +46,17 @@ prop_is_stuttering a b = do
   let zipped = aRatZip a b
   let stripped = first zipped
   isStuttering a stripped
+
+  
+prop_is_stuttering_failing :: Sig Int -> Sig Int -> Bool
+prop_is_stuttering_failing a b = do
+  isStuttering a b
+
+prop_eventual_equality_failing :: Sig Int -> Sig Int -> Bool
+prop_eventual_equality_failing startSignal laterSignal = do
+  let later = getLater laterSignal
+  isEventuallyEqual startSignal later
+
 
 -- Switch
 prop_eventual_equality :: Sig Int -> Sig Int -> Bool

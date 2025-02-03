@@ -28,6 +28,7 @@ library
       Main
       PropRatt.AsyncRat
       PropRatt.Generators
+      PropRatt.LTL
       PropRatt.Properties
       PropRatt.Utilities
   other-modules:
@@ -49,6 +50,7 @@ executable PropRatt-exe
   other-modules:
       PropRatt.AsyncRat
       PropRatt.Generators
+      PropRatt.LTL
       PropRatt.Properties
       PropRatt.Utilities
       Paths_PropRatt

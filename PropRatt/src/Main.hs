@@ -51,13 +51,13 @@ main = do
     -- 5. Green light is always followed by a yellow light (G (r -> X q))
     print (evaluateLTL (Always (Implies (Atom (== "Green")) (Next (Atom (== "Yellow"))))) goodList)
     -- 6. A light eventuall turns green (G F p)
-    print (evaluateLTL (Always (Eventually (Atom (== "Green")))) goodList)
+    print (evaluateLTL (Eventually (Atom (== "Green"))) goodList)
     -- 7. A light eventuall turns yellow (G F q)
-    print (evaluateLTL (Always (Eventually (Atom (== "Yellow")))) goodList)
+    print (evaluateLTL (Eventually (Atom (== "Yellow"))) goodList)
     -- 8. A light eventuall turns red (G F r)
-    print (evaluateLTL (Always (Eventually (Atom (== "Red")))) goodList)
+    print (evaluateLTL (Eventually (Atom (== "Red"))) goodList)
 
-    print (evaluateLTL (Always (Or (Or (Atom (== "Green")) (Atom (== "Yellow"))) (Atom (== "Red")))) badList) -- 1
+    print (evaluateLTL (Always (Or (Or (Atom (== "Green")) (Atom (== "Yellow"))) (Atom (== "Red")))) badList2) -- 1
     print (evaluateLTL (Always (Implies (Atom (== "Red")) (Next (Atom (== "Yellow"))))) badList) -- 3
     print (evaluateLTL (Always (Implies (Atom (== "Yellow")) (Next (Or (Atom (== "Red")) (Atom (== "Green")))))) badList) -- 4
     print (evaluateLTL (Always (Implies (Atom (== "Green")) (Next (Atom (== "Yellow"))))) badList) -- 5
@@ -65,6 +65,8 @@ main = do
     print (evaluateLTL (Always (Eventually (Atom (== "Yellow")))) badList2) -- 7
     print (evaluateLTL (Always (Eventually (Atom (== "Red")))) badList2) -- 8
 
+
+    --print (evaluateLTLSig (Eventually (Atom (=< 10))) goodList) )
 
 
 

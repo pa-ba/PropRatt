@@ -2,9 +2,7 @@
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 module PropRatt.LTL (
-    Pred (..),
-    evaluateLTL,
-    evaluateLTLSig
+    Pred (..), evaluateLTL
 ) where
 
 import AsyncRattus.Signal
@@ -22,7 +20,7 @@ data Pred a where
     Next :: Pred a -> Pred a
     Implies :: Pred a -> Pred a -> Pred a
     Always :: Pred a -> Pred a
-    Eventually :: Pred a -> Pred a
+    Eventually :: Pred a -> Pred a -- (Always True)
     After :: Int -> Pred a -> Pred a
     Release :: Pred a -> Pred a -> Pred a
 
@@ -39,29 +37,30 @@ evaluateLTL' amountOfPredCap formulae ls@(x:xs) = amountOfPredCap <= 0
         Next phi        -> evaluateNext phi xs -- X (Next)
         Implies phi psi -> not (evaluate phi ls && not (evaluate psi ls)) -- (phi: True, psi: False) = False (else True)
         Always phi      -> evaluate phi ls && evaluateNext (Always phi) xs -- G (Globally)
-        Eventually phi  -> not (amountOfPredCap == 1 && not (evaluate phi ls)) && (evaluate phi ls || evaluateNext (Eventually phi) xs) -- F (Later)
+        Eventually phi  -> evaluate phi ls || evaluateNext (Eventually phi) xs -- F (Later) -- (Always True)
         Release phi psi -> (evaluate psi ls && evaluate phi ls) || (evaluate psi ls && evaluateNext (phi `Until` psi) xs) -- R (Release)
         After n phi     -> if n <= 0 then evaluate phi ls else evaluateNext (After (n - 1) phi) ls
     where
         evaluateNext = evaluateLTL' (amountOfPredCap - 1)
         evaluate = evaluateLTL' amountOfPredCap
 
+
 evaluateLTLSig' :: Int -> Pred a -> Sig a -> Bool
-evaluateLTLSig' amountOfPredCap formulae ls@(x ::: Delay cl f) = amountOfPredCap <= 0
+evaluateLTLSig' amountOfPredCap formulae sig@(x ::: Delay cl f) = amountOfPredCap <= 0
     || case formulae of
         Tautology       -> True
         Contradiction   -> False
         Atom phi        -> phi x
-        Not phi         -> not (evaluate phi ls)
-        And phi psi     -> evaluate phi ls && evaluate psi ls
-        Or phi psi      -> evaluate phi ls || evaluate psi ls
-        Until phi psi   -> evaluate psi ls || (evaluate phi ls && evaluateNext (phi `Until` psi) (f (InputValue (smallest cl) ()))) -- U (Until)
+        Not phi         -> not (evaluate phi sig)
+        And phi psi     -> evaluate phi sig && evaluate psi sig
+        Or phi psi      -> evaluate phi sig || evaluate psi sig
+        Until phi psi   -> evaluate psi sig || (evaluate phi sig && evaluateNext (phi `Until` psi) (f (InputValue (smallest cl) ()))) -- U (Until)
         Next phi        -> evaluateNext phi (f (InputValue (smallest cl) ())) -- X (Next)
-        Implies phi psi -> not (evaluate phi ls && not (evaluate psi ls)) -- (phi: True, psi: False) = False (else True)
-        Always phi      -> evaluate phi ls && evaluateNext (Always phi) (f (InputValue (smallest cl) ())) -- G (Globally)
-        Eventually phi  -> not (amountOfPredCap == 1 && not (evaluate phi ls)) && (evaluate phi ls || evaluateNext (Eventually phi) (f (InputValue (smallest cl) ()))) -- F (Later)
-        Release phi psi -> (evaluate psi ls && evaluate phi ls) || (evaluate psi ls && evaluateNext (phi `Until` psi) (f (InputValue (smallest cl) ()))) -- R (Release)
-        After n phi     -> if n <= 0 then evaluate phi ls else evaluateNext (After (n - 1) phi) ls
+        Implies phi psi -> not (evaluate phi sig && not (evaluate psi sig)) -- (phi: True, psi: Fasige) = Fasige (esige True)
+        Always phi      -> evaluate phi sig && evaluateNext (Always phi) (f (InputValue (smallest cl) ())) -- G (Globally)
+        Eventually phi  -> not (amountOfPredCap == 1 && not (evaluate phi sig)) && (evaluate phi sig || evaluateNext (Eventually phi) (f (InputValue (smallest cl) ()))) -- F (Later)
+        Release phi psi -> (evaluate psi sig && evaluate phi sig) || (evaluate psi sig && evaluateNext (phi `Until` psi) (f (InputValue (smallest cl) ()))) -- R (Release)
+        After n phi     -> if n <= 0 then evaluate phi sig else evaluateNext (After (n - 1) phi) sig
     where
         evaluateNext = evaluateLTLSig' (amountOfPredCap - 1)
         evaluate = evaluateLTLSig' amountOfPredCap

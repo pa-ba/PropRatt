@@ -8,8 +8,10 @@
 
 module PropRatt.AsyncRat (
     aRatZip,
-    aRatSwitch
+    aRatSwitch,
+    aRatParallel
 ) where
+
 
 import AsyncRattus.Signal
 import AsyncRattus.Strict
@@ -21,3 +23,6 @@ aRatZip a b = zip a b
 
 aRatSwitch :: Sig a -> O(Sig a) -> Sig a
 aRatSwitch a o = switch a o
+
+aRatParallel :: (Stable a, Stable b) => Sig a -> Sig b -> Sig ((Maybe' a :* Maybe' b) :* (a :* b))
+aRatParallel a b = zip (parallel a b) (zip a b)

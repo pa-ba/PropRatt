@@ -17,7 +17,7 @@ import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith
 
 instance (Arbitrary a) => Arbitrary (Sig a) where
   arbitrary = do
-    len <- choose (2, 4) -- Introduced a lower limit of Signals of length 1, because when deconstructing and finding a later signal, from an original signal of length 0, an error is thrown
+    len <- choose (10, 20) -- Introduced a lower limit of Signals of length 1, because when deconstructing and finding a later signal, from an original signal of length 0, an error is thrown
     arbitrarySig len
 
 instance (Show a) => Show (Sig a) where

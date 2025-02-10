@@ -1,6 +1,22 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 module Main (main) where
-import PropRatt.LTL (Pred (..), evaluateLTL)
+import PropRatt.LTL (Pred (..), evaluateLTL, evaluateTupleSig)
+import AsyncRattus.Strict
+import AsyncRattus.InternalPrimitives
+import AsyncRattus.Signal
+import qualified Data.IntSet as IntSet hiding (map)
+import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
+
+
+ints0 :: Sig Int
+ints0 = 0 ::: Delay (IntSet.singleton 0) (\_ -> ints0)
+
+ints1 :: Sig Int
+ints1 = 1 ::: Delay (IntSet.singleton 1) (\_ -> ints1)
+
+-- exampleSignal :: Sig Int
+-- exampleSignal = 1 ::: delay (2 ::: delay (3 ::: delay (4 ::: never)))
+
 
 main :: IO ()
 main = do
@@ -67,6 +83,11 @@ main = do
 
 
     --print (evaluateLTLSig (Eventually (Atom (=< 10))) goodList) )
+
+
+    let paralZip = aRatParallel ints0 ints1
+
+    print (evaluateTupleSig (Always (Or (Atom2 (\a b -> fst a == fst b))) (Atom2 (\a b -> FST a == SND b))) ints0 ints1)
 
 
 

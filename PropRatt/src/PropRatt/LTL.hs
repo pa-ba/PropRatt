@@ -8,7 +8,7 @@ module PropRatt.LTL
     Pred2 (..),
     evaluateLTL,
     evaluateTupleSig,
-    compareMaybeHelper
+    (?=)
   )
 where
 
@@ -17,6 +17,7 @@ import AsyncRattus.Signal
 import AsyncRattus.Strict
 import qualified Data.IntSet as IntSet
 import PropRatt.Utilities (getLater)
+import PropRatt.AsyncRat (aRatParallel)
 
 data Pred a where
   Tautology :: Pred a
@@ -40,7 +41,7 @@ data Pred2 a b where
   Not2 :: Pred2 a b -> Pred2 a b
   And2 :: Pred2 a b -> Pred2  a b -> Pred2  a b
   Or2 :: Pred2  a b -> Pred2  a b -> Pred2  a b
-  Until2 :: Pred2  a b -> Pred2  a b -> Pred2  a b
+  Until2 :: Pred2 a b -> Pred2 a b -> Pred2  a b
   Next2 :: Pred2  a b -> Pred2  a b
   Implies2 :: Pred2  a b -> Pred2  a b -> Pred2  a b
   Always2 :: Pred2  a b -> Pred2  a b
@@ -110,14 +111,35 @@ evaluateTupleSig' amountOfPredCap formulae siga@(a ::: Delay cla fa) sigb@(b :::
     where
         evaluateNext = evaluateTupleSig' (amountOfPredCap - 1)
         evaluate = evaluateTupleSig' amountOfPredCap
-        smallest ca cb cc = IntSet.findMin (IntSet.union (IntSet.union ca cb) cc)
-        advA = fa (InputValue (smallest cla clb clc) ())
-        advB = fb (InputValue (smallest cla clb clc) ())
-        advC = fc (InputValue (smallest cla clb clc) ())
+        smallest = IntSet.findMin (IntSet.unions [cla, clb, clc])
+        advA = tickIfMember siga smallest
+        advB = tickIfMember sigb smallest
+        advC = tickIfMember sigc smallest
 
-compareMaybeHelper :: (Eq a) => Maybe' a -> a -> Bool
-compareMaybeHelper (Just' x) y = x == y
-compareMaybeHelper Nothing' _ = False
+-- Is this nescessary? What happens if you supply a channelId to an (InputValue -> a) function? Ie. advance on a clock that doesn't have 
+
+tickIfMember :: Sig a -> Int -> Sig a
+tickIfMember sig@(a ::: Delay cl f) id = if id `channelMember` cl then f (InputValue id ()) else sig
+
+-- Example 1:
+
+-- s1 = zip xs ys
+-- s2 = xs
+-- s3 = ys
+
+-- G (fst (current s1) = current s2 \/ snd (current s1) = current s3)
+
+-- Example 2:
+
+-- s1 = switch xs ys cl (1,2,3)
+-- s2 = xs cl (2,3)
+-- s3 = 0 ::: ys cl (1)
+
+-- Until (current s1 = current s2) (current s1 = current ys)
+
+(?=) :: (Eq a) => Maybe' a -> a -> Bool
+Just' x ?= y = x == y
+Nothing' ?= _ = False
 
 evaluateLTL :: Pred a -> [a] -> Bool
 evaluateLTL = evaluateLTL' 4
@@ -125,5 +147,5 @@ evaluateLTL = evaluateLTL' 4
 evaluateLTLSig :: Pred a -> Sig a -> Bool
 evaluateLTLSig = evaluateLTLSig' 10
 
-evaluateTupleSig :: Pred2 a b -> Sig (Maybe' a :* Maybe' b) -> Sig a -> Sig b -> Bool
-evaluateTupleSig = evaluateTupleSig' 3
+evaluateTupleSig :: Pred2 a b -> Sig a -> Sig b -> Bool
+evaluateTupleSig pred a b = evaluateTupleSig' 3 pred (aRatParallel a b) a b

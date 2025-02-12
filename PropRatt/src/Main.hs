@@ -1,11 +1,13 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 module Main (main) where
-import PropRatt.LTL (Pred (..), evaluateLTL, evaluateTupleSig)
+import PropRatt.LTL (Pred (..), Pred2 (..), evaluateLTL, evaluateTupleSig, compareMaybeHelper)
+import PropRatt.AsyncRat (aRatParallel, aRatSwitch)
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
 import AsyncRattus.Signal
 import qualified Data.IntSet as IntSet hiding (map)
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
+import PropRatt.Utilities (getLater)
 
 
 ints0 :: Sig Int
@@ -85,10 +87,13 @@ main = do
     --print (evaluateLTLSig (Eventually (Atom (=< 10))) goodList) )
 
 
-    let paralZip = aRatParallel ints0 ints1
+    -- let paralZip = aRatParallel ints0 ints1
 
-    print (evaluateTupleSig (Always (Or (Atom2 (\a b -> fst a == fst b))) (Atom2 (\a b -> FST a == SND b))) ints0 ints1)
+    -- print (evaluateTupleSig (Always (Or (Atom2 (\a b -> fst a == fst b))) (Atom2 (\a b -> FST a == SND b))) ints0 ints1)
 
+    let paralleled = aRatParallel ints0 ints1
 
+    print (evaluateTupleSig (Always2 (Atom2 (\s1 s2 s3 -> compareMaybeHelper (fst' s1) s2) `Or2` Atom2 (\s1 s2 s3 -> compareMaybeHelper (snd' s1) s3))) paralleled ints0 ints1)
 
-
+    let switched = aRatSwitch ints0 (getLater ints1)
+    print (evaluateTupleSig (Until2 (\s1 s2 s3 -> s1 == s2) (\s1 s2 s3 -> s1 == s3)) switched ints0 (getLater ints1))

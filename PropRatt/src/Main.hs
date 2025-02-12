@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 module Main (main) where
-import PropRatt.LTL (Pred (..), Pred2 (..), evaluateLTL, evaluateTupleSig, (?=))
+import PropRatt.LTL
 import PropRatt.AsyncRat (aRatParallel, aRatSwitch)
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
@@ -8,6 +8,7 @@ import AsyncRattus.Signal
 import qualified Data.IntSet as IntSet hiding (map)
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Utilities (getLater)
+import PropRatt.Current
 
 
 ints0 :: Sig Int
@@ -85,7 +86,6 @@ main = do
 
 
     --print (evaluateLTLSig (Eventually (Atom (=< 10))) goodList) )
-
 
     -- let paralZip = aRatParallel ints0 ints1
 

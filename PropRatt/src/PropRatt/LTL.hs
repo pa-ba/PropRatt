@@ -8,7 +8,6 @@ module PropRatt.LTL
     Pred2 (..),
     evaluateLTL,
     evaluateTupleSig,
-    (?=)
   )
 where
 
@@ -17,7 +16,8 @@ import AsyncRattus.Signal
 import AsyncRattus.Strict
 import qualified Data.IntSet as IntSet
 import PropRatt.Utilities (getLater)
-import PropRatt.AsyncRat (aRatParallel)
+import PropRatt.AsyncRat (aRatParallel, mkCurrentSig, mkCurrentSigSingle)
+import PropRatt.Current
 
 data Pred a where
   Tautology :: Pred a
@@ -37,7 +37,7 @@ data Pred a where
 data Pred2 a b where
   Tautology2 :: Pred2 a b
   Contradiction2 :: Pred2 a b
-  Atom2 :: ((Maybe' a :* Maybe' b) -> a -> b -> Bool) -> Pred2 a b
+  Atom2 :: ((Current a :* Current b) -> Current a -> Current b -> Bool) -> Pred2 a b
   Not2 :: Pred2 a b -> Pred2 a b
   And2 :: Pred2 a b -> Pred2  a b -> Pred2  a b
   Or2 :: Pred2  a b -> Pred2  a b -> Pred2  a b
@@ -92,7 +92,7 @@ evaluateLTLSig' amountOfPredCap formulae sig@(x ::: Delay cl f) =
     evaluate = evaluateLTLSig' amountOfPredCap
     smallest = IntSet.findMin
 
-evaluateTupleSig' :: Int -> Pred2 a b -> Sig (Maybe' a :* Maybe' b) -> Sig a -> Sig b -> Bool
+evaluateTupleSig' :: (Stable a, Stable b) => Int -> Pred2 a b -> Sig (Current a :* Current b) -> Sig (Current a) -> Sig (Current b) -> Bool
 evaluateTupleSig' amountOfPredCap formulae siga@(a ::: Delay cla fa) sigb@(b ::: Delay clb fb) sigc@(c ::: Delay clc fc) =
   amountOfPredCap <= 0 || case formulae of
         Tautology2       -> True
@@ -137,15 +137,12 @@ tickIfMember sig@(a ::: Delay cl f) id = if id `channelMember` cl then f (InputV
 
 -- Until (current s1 = current s2) (current s1 = current ys)
 
-(?=) :: (Eq a) => Maybe' a -> a -> Bool
-Just' x ?= y = x == y
-Nothing' ?= _ = False
 
 evaluateLTL :: Pred a -> [a] -> Bool
 evaluateLTL = evaluateLTL' 4
 
-evaluateLTLSig :: Pred a -> Sig a -> Bool
+evaluateLTLSig :: (Stable a) => Pred a -> Sig a -> Bool
 evaluateLTLSig = evaluateLTLSig' 10
 
-evaluateTupleSig :: Pred2 a b -> Sig a -> Sig b -> Bool
-evaluateTupleSig pred a b = evaluateTupleSig' 3 pred (aRatParallel a b) a b
+evaluateTupleSig :: (Stable a, Stable b) => Pred2 a b -> Sig a -> Sig b -> Bool
+evaluateTupleSig pred a b = evaluateTupleSig' 3 pred (mkCurrentSig a b) (mkCurrentSigSingle a) (mkCurrentSigSingle b)

@@ -7,7 +7,6 @@ module PropRatt.LTL
   ( Pred (..),
     Pred2 (..),
     evaluateLTL,
-    evaluateTupleSig,
   )
 where
 
@@ -16,8 +15,8 @@ import AsyncRattus.Signal
 import AsyncRattus.Strict
 import qualified Data.IntSet as IntSet
 import PropRatt.Utilities (getLater)
-import PropRatt.AsyncRat (aRatParallel, mkCurrentSig, mkCurrentSigSingle)
-import PropRatt.Current
+import PropRatt.AsyncRat (aRatParallel)
+import PropRatt.Value
 
 data Pred a where
   Tautology :: Pred a
@@ -30,14 +29,14 @@ data Pred a where
   Next :: Pred a -> Pred a
   Implies :: Pred a -> Pred a -> Pred a
   Always :: Pred a -> Pred a
-  Eventually :: Pred a -> Pred a -- (Always True)
+  Eventually :: Pred a -> Pred a
   After :: Int -> Pred a -> Pred a
   Release :: Pred a -> Pred a -> Pred a
 
 data Pred2 a b where
   Tautology2 :: Pred2 a b
   Contradiction2 :: Pred2 a b
-  Atom2 :: ((Current a :* Current b) -> Current a -> Current b -> Bool) -> Pred2 a b
+  Atom2 :: ((Value a :* Value b) -> Value a -> Value b -> Bool) -> Pred2 a b
   Not2 :: Pred2 a b -> Pred2 a b
   And2 :: Pred2 a b -> Pred2  a b -> Pred2  a b
   Or2 :: Pred2  a b -> Pred2  a b -> Pred2  a b
@@ -45,7 +44,7 @@ data Pred2 a b where
   Next2 :: Pred2  a b -> Pred2  a b
   Implies2 :: Pred2  a b -> Pred2  a b -> Pred2  a b
   Always2 :: Pred2  a b -> Pred2  a b
-  Eventually2 :: Pred2  a b -> Pred2  a b -- (Always True)
+  Eventually2 :: Pred2  a b -> Pred2  a b
   After2 :: Int -> Pred2  a b -> Pred2  a b
   Release2 :: Pred2  a b -> Pred2  a b -> Pred2  a b
 
@@ -92,7 +91,7 @@ evaluateLTLSig' amountOfPredCap formulae sig@(x ::: Delay cl f) =
     evaluate = evaluateLTLSig' amountOfPredCap
     smallest = IntSet.findMin
 
-evaluateTupleSig' :: (Stable a, Stable b) => Int -> Pred2 a b -> Sig (Current a :* Current b) -> Sig (Current a) -> Sig (Current b) -> Bool
+evaluateTupleSig' :: (Stable a, Stable b) => Int -> Pred2 a b -> Sig (Value a :* Value b) -> Sig (Value a) -> Sig (Value b) -> Bool
 evaluateTupleSig' amountOfPredCap formulae siga@(a ::: Delay cla fa) sigb@(b ::: Delay clb fb) sigc@(c ::: Delay clc fc) =
   amountOfPredCap <= 0 || case formulae of
         Tautology2       -> True
@@ -127,7 +126,7 @@ tickIfMember sig@(a ::: Delay cl f) id = if id `channelMember` cl then f (InputV
 -- s2 = xs
 -- s3 = ys
 
--- G (fst (current s1) = current s2 \/ snd (current s1) = current s3)
+-- G (fst (Value s1) = Value s2 \/ snd (Value s1) = Value s3)
 
 -- Example 2:
 
@@ -135,7 +134,7 @@ tickIfMember sig@(a ::: Delay cl f) id = if id `channelMember` cl then f (InputV
 -- s2 = xs cl (2,3)
 -- s3 = 0 ::: ys cl (1)
 
--- Until (current s1 = current s2) (current s1 = current ys)
+-- Until (Value s1 = Value s2) (Value s1 = Value ys)
 
 
 evaluateLTL :: Pred a -> [a] -> Bool
@@ -144,5 +143,3 @@ evaluateLTL = evaluateLTL' 4
 evaluateLTLSig :: (Stable a) => Pred a -> Sig a -> Bool
 evaluateLTLSig = evaluateLTLSig' 10
 
-evaluateTupleSig :: (Stable a, Stable b) => Pred2 a b -> Sig a -> Sig b -> Bool
-evaluateTupleSig pred a b = evaluateTupleSig' 3 pred (mkCurrentSig a b) (mkCurrentSigSingle a) (mkCurrentSigSingle b)

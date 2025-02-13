@@ -27,11 +27,11 @@ library
   exposed-modules:
       Main
       PropRatt.AsyncRat
-      PropRatt.Current
       PropRatt.Generators
       PropRatt.LTL
       PropRatt.Properties
       PropRatt.Utilities
+      PropRatt.Value
   other-modules:
       Paths_PropRatt
   autogen-modules:
@@ -50,11 +50,11 @@ executable PropRatt-exe
   main-is: Main.hs
   other-modules:
       PropRatt.AsyncRat
-      PropRatt.Current
       PropRatt.Generators
       PropRatt.LTL
       PropRatt.Properties
       PropRatt.Utilities
+      PropRatt.Value
       Paths_PropRatt
   autogen-modules:
       Paths_PropRatt

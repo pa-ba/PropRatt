@@ -1,14 +1,15 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 module Main (main) where
 import PropRatt.LTL
-import PropRatt.AsyncRat (aRatParallel, aRatSwitch)
+import PropRatt.AsyncRat (aRatParallel, aRatSwitch, mkSig)
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
-import AsyncRattus.Signal
+import AsyncRattus.Signal hiding (mkSig)
 import qualified Data.IntSet as IntSet hiding (map)
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Utilities (getLater)
-import PropRatt.Current
+import Data.Typeable (typeOf)
+import PropRatt.Value
 
 
 ints0 :: Sig Int
@@ -88,8 +89,14 @@ main = do
     --print (evaluateLTLSig (Eventually (Atom (=< 10))) goodList) )
 
     -- let paralZip = aRatParallel ints0 ints1
+    let values = mkSig ints0
+    print (typeOf values)
+    print (values)
 
+    
+
+ 
     -- print (evaluateTupleSig (Always (Or (Atom2 (\a b -> fst a == fst b))) (Atom2 (\a b -> FST a == SND b))) ints0 ints1)
-    print (evaluateTupleSig (Always2 (Atom2 (\s1 s2 s3 -> (fst' s1) ?= s2) `Or2` Atom2 (\s1 s2 s3 -> (snd' s1) ?= s3))) ints0 ints1)
+    --print (evaluateTupleSig (Always2 (Atom2 (\s1 s2 s3 -> (fst' s1) ?= s2) `Or2` Atom2 (\s1 s2 s3 -> (snd' s1) ?= s3))) ints0 ints1)
 
-    print (evaluateTupleSig (Until2 (Atom2 (\s1 s2 s3 -> (fst' s1) ?= s2)) (Atom2 (\s1 s2 s3 -> (snd' s1) ?= s3))) ints0 ints1)
+    --print (evaluateTupleSig (Until2 (Atom2 (\s1 s2 s3 -> (fst' s1) ?= s2)) (Atom2 (\s1 s2 s3 -> (snd' s1) ?= s3))) ints0 ints1)

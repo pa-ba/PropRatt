@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 module Main (main) where
 import PropRatt.LTL
-import PropRatt.AsyncRat (aRatParallel, aRatSwitch, mkSig)
+import PropRatt.AsyncRat (aRatParallel, aRatSwitch)
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
 import AsyncRattus.Signal hiding (mkSig)
@@ -89,9 +89,9 @@ main = do
     --print (evaluateLTLSig (Eventually (Atom (=< 10))) goodList) )
 
     -- let paralZip = aRatParallel ints0 ints1
-    let values = mkSig ints0
-    print (typeOf values)
-    print (values)
+    --let values = mkSig ints0
+    --print (typeOf values)
+    --print (values)
  
     -- print (evaluateTupleSig (Always (Or (Atom2 (\a b -> fst a == fst b))) (Atom2 (\a b -> FST a == SND b))) ints0 ints1)
     --print (evaluateTupleSig (Always2 (Atom2 (\s1 s2 s3 -> (fst' s1) ?= s2) `Or2` Atom2 (\s1 s2 s3 -> (snd' s1) ?= s3))) ints0 ints1)

@@ -1,13 +1,13 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
-module PropRatt.Value (Value(..)) where
+module PropRatt.Value (Value(..), makeNothings) where
 import AsyncRattus.Strict
 import AsyncRattus.Signal
 import PropRatt.Utilities
 
 data Value a where
-  Current :: Maybe' a -> a -> Value a
+  Current :: !(Maybe' a) -> !a -> Value a
 
 instance Show a => Show (Value a) where
   show (Current m y) =
@@ -17,6 +17,12 @@ instance Show a => Show (Value a) where
 
 instance Show a => Show (Sig [Value a]) where
   show sig = "Sig [Value a]: " ++ show (takeSigExhaustive sig) ++ "..."
+
+
+makeNothings :: List (Value a) -> List (Value a)
+makeNothings Nil = Nil
+makeNothings ((Current _ x) :! Nil) = Current Nothing' x :! Nil
+makeNothings ((Current _ x) :! xs) = Current Nothing' x :! makeNothings xs
 
 -- latest' :: (Eq a) => Current a -> a
 -- latest' (Current _ latest) = latest

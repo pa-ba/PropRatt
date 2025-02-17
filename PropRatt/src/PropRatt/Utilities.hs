@@ -13,7 +13,7 @@ module PropRatt.Utilities (
     stuttering,
     isEventuallyEqual,
     getLater,
-    sigAEqualsSigB
+    sigAEqualsSigB,
 ) where
 
 import AsyncRattus.Strict

@@ -10,7 +10,6 @@ module PropRatt.AsyncRat (
     aRatZip,
     aRatSwitch,
     aRatParallel,
-    mkSig,
 ) where
 
 
@@ -29,46 +28,59 @@ aRatSwitch a o = switch a o
 aRatParallel :: Sig a -> Sig b -> Sig (Maybe' a :* Maybe' b) -- Sig (Current a) 
 aRatParallel a b = parallel a b
 
-mkSig :: Sig a -> Sig [Value a]
-mkSig xs = map (box (\x -> [Current (Just' x) x])) xs
+-- Create a signal of singleton values
+singleton' :: Sig a -> Sig [Value a]
+singleton' xs = map (box (\x -> [Current (Just' x) x])) xs
 
-flattenSig :: [Sig a] -> Sig [Value a]
-flattenSig sigs =
-  let current = [ Current (Just' x) x | (x ::: _) <- sigs ] -- [Value a] denne linje rigtig?
-      tails   = [ xs | (_ ::: xs) <- sigs ] -- [0 (Sig a)] funky
-  in current ::: delay (flattenSig tails)
+makeSig :: [Sig [Value a]] -> Sig [Value a]
+makeSig ls = foldr1 prependSig ls
 
-  --let valSig@([xvs : xsvs] ::: Delay clvs fvs) = mkSig x 
+makeSignals :: [Sig a] -> [Sig [Value a]]
+makeSignals [] = []
+makeSignals [s] = singleton' s
+makeSignals [s:ss] = singleton' s : makeSignals ss
 
-  -- mkSig to get sig of list of as
-  -- deconstruct, to take head of list, append to mother list, and append tail of recursisve call on rest
-  
-  -- ::: delay (box (flattenSig xs))
+helper :: Sig a -> Sig [Value a] -> Sig [Value a]
+helper a b = prependSig (singleton' a) b
 
--- appendSig :: Sig a -> Sig [Value a] -> Sig [Value a]
--- appendSig sigx ls = 
---   -- Parallel call here :D 
---   let new = mkSig sigx
---   helper new ls
+latest :: Value a
+latest (Current _ a) = a
 
--- helper :: Sig [Value a] -> Sig [Value a] -> Sig [Value a]
--- helper sigx@(x ::: xs) sigl@(l ::: ls) = case l of
---   [] -> sigx
---   _ -> l:x ::: select xs ls of 
---     Fst xs' _ -> helper xs' sigl
---     Snd _ ls' -> helper sigx ls'
---     Both xs' ls' -> helper xs' ls' 
+prependSig :: Sig a -> Sig [Value a] -> Sig [Value a]
+prependSig siga@(a ::: as) sigl@(l ::: ls) = 
+  case parallel siga sigl of -- (Maybe' [Value a] :* Maybe' [Value a])
+    (Just' x :* Nothing') ::: pss -> (Current (Just' x) x : l) ::: prependSigAwait as ls
+    (Nothing' :* Just' y) ::: pss -> (Current (Nothing') a : y) ::: prependSigAwait as ls
+    (Just' x :* Just' y) ::: pss -> (Current (Just' x) x : y) ::: prependSigAwait as ls
 
 
--- Sig []
--- mkCurrentSig :: (Stable a, Stable b) => Sig a -> Sig b -> Sig (Current a :* Current b)
--- mkCurrentSig a b =
---   zipWith combine (parallel a b) (zip a b)
---   where
---     combine = box (\(ma :* mb) (aVal :* bVal) -> Current ma aVal :* Current mb bVal)
+prependSigAwait :: O (Sig a) -> O (Sig [Value a]) -> O (Sig [Value a])
+prependSigAwait siga@(a ::: as) sigl@(l ::: ls) = 
+  case parallelAwait siga sigl of
+    (Just' x :* Nothing') ::: pss -> (Current (Just' x) x : l) ::: prependSigAwait as ls
+    (Nothing':* Just' y) ::: pss -> (Current Nothing' a : y) ::: prependSigAwait as ls
+    (Just' x :* Just' y) ::: pss -> (Current (Just' x) x : y) ::: prependSigAwait as ls
 
--- mkCurrentSigSingle :: (Stable a) => Sig a -> Sig (Current a)
--- mkCurrentSigSingle xs = map (box (\a -> Current (Just' a) a)) xs
 
--- aRatParallelAndZip :: (Stable a, Stable b) => Sig a -> Sig b -> Sig ((Maybe' a :* Maybe' b) :* (a :* b))
--- aRatParallelAndZip a b = zip (parallel a b) (zip a b)
+
+
+
+
+
+-- -- -- Flatten a list of signals to a signal of values
+-- combineSigs :: [Sig a] -> Sig [Value a]
+-- combineSigs [] = const []
+-- combineSigs [s] = singleton' s   
+-- combineSigs (s:ss) = map (box appendValue) (parallel s (combineSigs ss))
+
+-- Add a signal to the mother list
+-- prependSig :: (Stable a) => Sig a -> Sig [Value a] -> Sig [Value a]
+-- prependSig siga@(a ::: as) sigl@(l ::: ls) = 
+--   let single = singleton' siga
+--   in
+--   case parallel single sigl of
+--     (Just' x :* Just' y) ::: pss -> Current (Just' x) x : y ::: pss
+--     (Just' x :* Nothing') ::: pss -> Current (Just' x) x : l ::: pss
+--     (Nothing':* Just' y) ::: pss -> Current Nothing' a : y ::: pss
+--     (Nothing' :* Nothing') ::: pss -> Current Nothing' a : l ::: pss
+        

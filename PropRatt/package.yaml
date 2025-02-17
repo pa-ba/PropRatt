@@ -50,6 +50,7 @@ executables:
     dependencies:
     - PropRatt
 
+
 tests:
   PropRatt-test:
     main:                Spec.hs

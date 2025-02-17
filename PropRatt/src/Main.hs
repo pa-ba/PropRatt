@@ -92,9 +92,6 @@ main = do
     let values = mkSig ints0
     print (typeOf values)
     print (values)
-
-    
-
  
     -- print (evaluateTupleSig (Always (Or (Atom2 (\a b -> fst a == fst b))) (Atom2 (\a b -> FST a == SND b))) ints0 ints1)
     --print (evaluateTupleSig (Always2 (Atom2 (\s1 s2 s3 -> (fst' s1) ?= s2) `Or2` Atom2 (\s1 s2 s3 -> (snd' s1) ?= s3))) ints0 ints1)

@@ -7,6 +7,7 @@ module PropRatt.LTL
   ( Pred (..),
     Pred2 (..),
     evaluateLTL,
+    evaluateLTLSig
   )
 where
 

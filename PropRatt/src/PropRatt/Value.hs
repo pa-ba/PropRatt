@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module PropRatt.Value (Value(..), makeNothings) where
 import AsyncRattus.Strict
-import AsyncRattus.Signal
+import AsyncRattus.Signal hiding (current)
 import PropRatt.Utilities
 
 data Value a where
@@ -12,23 +12,18 @@ data Value a where
 instance Show a => Show (Value a) where
   show (Current m y) =
     case m of
-      Just' x  -> "Current: Just' " ++ show x ++ ", Latest: " ++ show y
-      Nothing' -> "Current: None, Latest: " ++ show y
+      Just' x  -> "J:" ++ show x ++ ",L:" ++ show y
+      Nothing' -> "N,L:" ++ show y
 
 instance Show a => Show (Sig [Value a]) where
   show sig = "Sig [Value a]: " ++ show (takeSigExhaustive sig) ++ "..."
 
+current' :: Value a -> a
+current' (Current (Just' x) _) = x
+current' (Current Nothing' x) = x
 
 makeNothings :: List (Value a) -> List (Value a)
-makeNothings Nil = Nil
-makeNothings ((Current _ x) :! Nil) = Current Nothing' x :! Nil
-makeNothings ((Current _ x) :! xs) = Current Nothing' x :! makeNothings xs
+makeNothings = map' (\(Current _ x) -> Current Nothing' x)
 
--- latest' :: (Eq a) => Current a -> a
--- latest' (Current _ latest) = latest
-
--- (?=) :: Eq a => Current a -> Current a -> Bool
--- (Current m1 _) ?= (Current m2 _) =
---   case (m1, m2) of
---     (Just' x, Just' y) -> x == y
---     _ -> False
+(?=) :: Eq a => Value a -> Value a -> Bool
+a ?= b = current' a == current' b

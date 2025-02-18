@@ -27,6 +27,7 @@ library
   exposed-modules:
       Main
       PropRatt.AsyncRat
+      PropRatt.Flatten
       PropRatt.Generators
       PropRatt.LTL
       PropRatt.Properties
@@ -50,6 +51,7 @@ executable PropRatt-exe
   main-is: Main.hs
   other-modules:
       PropRatt.AsyncRat
+      PropRatt.Flatten
       PropRatt.Generators
       PropRatt.LTL
       PropRatt.Properties

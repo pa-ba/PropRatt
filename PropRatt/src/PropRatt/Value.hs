@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
-module PropRatt.Value (Value(..), makeNothings) where
+module PropRatt.Value (Value(..),(?=)) where
 import AsyncRattus.Strict
 import AsyncRattus.Signal hiding (current)
 import PropRatt.Utilities
@@ -21,9 +21,6 @@ instance Show a => Show (Sig [Value a]) where
 current' :: Value a -> a
 current' (Current (Just' x) _) = x
 current' (Current Nothing' x) = x
-
-makeNothings :: List (Value a) -> List (Value a)
-makeNothings = map' (\(Current _ x) -> Current Nothing' x)
 
 (?=) :: Eq a => Value a -> Value a -> Bool
 a ?= b = current' a == current' b

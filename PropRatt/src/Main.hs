@@ -4,13 +4,15 @@ import PropRatt.LTL
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
 import AsyncRattus.Signal hiding (mkSig)
-import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
-import PropRatt.Flatten
+import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith, take)
 import Test.QuickCheck (Gen, Arbitrary (arbitrary))
 import Test.QuickCheck.Gen (generate)
 import PropRatt.Generators ()
+import PropRatt.Value
+-- import PropRatt.AsyncRat (flattenToSignal, flattenToSignal', aRatSwitch, prepend)
+import PropRatt.Utilities (getLater)
 
--- make list of n arbitrary signals
+-- make list of n+1 arbitrary signals
 makeN :: Int -> IO (List (Sig Int))
 makeN 0 = do
     arb <- generate (arbitrary :: Gen (Sig Int))
@@ -22,10 +24,18 @@ makeN x = do
 
 instance Stable Int where
 
+take :: List a -> Int -> a
+take (h :! t) n
+    | n <= 1 = h
+    | otherwise = take t (n-1)
+
 main :: IO ()
 main = do
-    signals <- makeN 2
-    print $ flattenToSignal' signals
+    -- signals <- makeN 1
+    -- let switched = aRatSwitch (take signals 1) (getLater (take signals 2))
+    -- let twoSig = flattenToSignal' signals
+    -- let added = prepend switched twoSig
+    -- print (evaluateLTLSigs (Until (Atom (\ls -> take ls 1 ?= take ls 2)) (Atom (\ls -> take ls 1 ?= take ls 3))) added)
     -- print (evaluateLTL (Eventually (Implies (Atom odd) (Next (Atom (== 4))))) [2,2,2,3,4])
     -- print (evaluateLTL (Eventually (Atom odd)) [2,2,2,2,2,2])
     -- print (evaluateLTL (Implies
@@ -90,9 +100,7 @@ main = do
     --print (evaluateLTLSig (Eventually (Atom (=< 10))) goodList) )
 
     --let values = mkSig ints0
-    --print (typeOf values)
+    print ("hej")
  
     -- print (evaluateTupleSig (Always (Or (Atom2 (\a b -> fst a == fst b))) (Atom2 (\a b -> FST a == SND b))) ints0 ints1)
     --print (evaluateTupleSig (Always2 (Atom2 (\s1 s2 s3 -> (fst' s1) ?= s2) `Or2` Atom2 (\s1 s2 s3 -> (snd' s1) ?= s3))) ints0 ints1)
-
-    --print (evaluateTupleSig (Until2 (Atom2 (\s1 s2 s3 -> (fst' s1) ?= s2)) (Atom2 (\s1 s2 s3 -> (snd' s1) ?= s3))) ints0 ints1)

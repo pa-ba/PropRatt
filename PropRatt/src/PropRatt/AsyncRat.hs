@@ -54,21 +54,22 @@ instance (Show x, (Show (HList xs))) => Show (HList (x ': xs)) where
 aRatZip :: Sig Int -> Sig Int -> Sig (Int :* Int)
 aRatZip a b = zip a b
 
-aRatSwitch :: Sig a -> O(Sig a) -> Sig a
+aRatSwitch :: Sig a -> O (Sig a) -> Sig a
 aRatSwitch a o = switch a o
 
 aRatParallel :: Sig a -> Sig b -> Sig (Maybe' a :* Maybe' b)
 aRatParallel a b = parallel a b
 
-singleton' :: Sig a -> Sig (HList (Map '[Value a]))
+singleton' :: Sig a -> Sig (HList '[Value a])
 singleton' xs = map (box (\p -> Current (Just' p) p %: HNil)) xs
 
 -- lacks maph constraint
-prepend :: (Stable a) => Sig a -> Sig (HList (Map (Value a ': xs))) -> Sig (HList (Map (Value a ': xs)))
+prepend :: (Stable a) => Sig a -> Sig (HList (Map (a ': xs))) -> Sig (HList (Map (a ': xs)))
 prepend q (y ::: ys) = do
   -- make input sig into same type as acc :: Sig (HList (Map (Value a) xs))
-  let ((HCons o p) ::: xs) = singleton' q 
-  (o %: y) ::: prependAwait xs ys
+  let (x ::: xs) = singleton' q 
+  --let (HCons x' HNil) = x
+  (x %: y) ::: prependAwait xs ys
 
 -- lacks maph constraint
 -- lacks symbol function to map values to nothing
@@ -87,9 +88,9 @@ instance Apply Valify a (Value a) where
   apply _ x = Current (Just' x) x
 
 type family Map (xs :: [Type]) :: [Type] where
-  Map '[] = '[] 
+  Map '[]       = '[]
   Map '[Value a] = '[Value a]
-  Map (x ': xs) = Value x ': Map xs
+  Map (x ': xs) = Wrap x ': Map xs
 
 class MapH f xs ys where
   mapH :: f -> HList xs -> HList ys
@@ -109,22 +110,25 @@ instance (Apply f x y, MapH f xs ys) => MapH f (x ': xs) (y ': ys) where
 instance (Apply f x (acc -> acc), FoldrH f acc xs) => FoldrH f acc (x ': xs) where
   foldrH f acc (HCons x xs) = apply f x $ foldrH f acc xs
 
+-- type family AllStable (a ': as) 
+
+class AllStable (as :: [Type]) where 
+
+instance AllStable '[] where
+
+instance (Stable a, AllStable as) => AllStable (a ': as) where
+
+type family Wrap (a :: Type) :: Type where
+  Wrap a = Value a
+
 data Flatten = Flatten
 instance (q ~ HList (Map xs), r ~ HList (Map xs)) => Apply Flatten (HList (Sig a ': xs)) (Sig q -> Sig r) where
   apply _ (HCons x xs) = prepend x -- partially apply prepend, cps
 
-{-# ANN flattenToSignal' AllowRecursion #-}
-flattenToSignal' :: forall a xs. 
-  ( Stable a,
-    MapH    Valify  xs            (Map xs)
-    --FoldrH  Flatten xs            (Map (Value a) xs)
-  ) =>  HList (Sig a ': xs) -> Sig (HList (Map (Value a ': xs)))
-flattenToSignal' xs = foldrH Flatten (singleton' (HNil ::: never)) xs
+--{-# ANN flattenToSignal AllowRecursion #-}
+flattenToSignal :: AllStable as => HList (Map as) -> Sig (HList (Map as))
+flattenToSignal xs = foldrH Flatten (singleton' (HNil ::: never)) xs
 
--- We have tried to generalize to signals of any types by defining it in terms of fold
--- We are currently struggling with trying to refac the function needed for the fold
-
-
--- flattenToSignal :: (Stable a) => NonEmptyList (Sig a) -> Sig (HList (Value a))
+-- flattenToSignal :: AllStable as => HList (Map Sig as) -> Sig (HList (Map Value as))
 -- flattenToSignal (NonEmptyList h Nil) = singleton' h
 -- flattenToSignal (NonEmptyList h t)   = prepend h (flattenToSignal' t)

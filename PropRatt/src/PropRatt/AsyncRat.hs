@@ -63,11 +63,6 @@ infixr 5 %:
 class Apply f a b where
   apply :: f -> a -> b
 
-data Valify = Valify
-instance Apply Valify a (Value a) where
-  apply _ x = Current (Just' x) x
-
-
 instance (Show x, (Show (HList xs))) => Show (HList (x ': xs)) where
   show (HCons x xs) = show x ++ " %: " ++ show xs 
 
@@ -94,62 +89,37 @@ type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
 instance Stable (HList '[]) where
 instance (Stable a, Stable (HList as)) => Stable (HList (a ': as)) where
 
-class Stable (HList vals) => Flatten sigs vals | sigs -> vals, vals -> sigs, vals -> vals where
+class Stable (HList vals) => Flatten sigs vals | sigs -> vals, vals -> sigs where
   flatten :: HList sigs -> Sig (HList vals)
-  --makeNothings :: vals -> vals
+
+class Stable (HList vals1) => Nothingfy vals1 vals2 where
+  makeNothings :: HList vals1 -> HList vals2
 
 instance Stable a => Flatten '[Sig a] '[Value a] where
   flatten (HCons head HNil) = singleton' head
 
-instance (Stable a, Flatten sigs vals) => Flatten (Sig a ': sigs) (Value a ': vals) where
+instance (Stable a, Flatten sigs vals, Nothingfy vals vals) => Flatten (Sig a ': sigs) (Value a ': vals) where
   flatten (HCons head tail) = prepend head (flatten tail)
 
--- instance Stable a => Flatten '[Value a] '[Value a] where
---   makeNothings (HCons (Current x y) HNil) = (Current Nothing' y)
+instance Stable a => Nothingfy '[Value a] '[Value a] where
+  makeNothings (HCons (Current x y) HNil) = Current Nothing' y %: HNil
 
--- instance (Stable a, Flatten sigs vals) => Flatten (Value a ': vals) (Value a ': vals) where
---   makeNothings (HCons (Current x y) tail) = (Current Nothing' y) %: makeNothings tail
-
-makeNothings :: HList (Value a) -> HList (Value a)
-makeNothings (HCons (Current x y) HNil) = (Current Nothing' y)
-makeNothings (HCons (Current x y) tail) = (Current Nothing' y) %: makeNothings tail
+instance (Stable a, Nothingfy as as) => Nothingfy (Value a ': as) (Value a ': as) where
+  makeNothings (HCons (Current x y) tail) = Current Nothing' y %: makeNothings tail
 
 
-prepend :: (Stable a, Flatten sigs vals) => Sig a -> Sig (HList vals) -> Sig (HList (Value a ': vals))
+prepend :: (Stable a, Flatten sigs vals, Nothingfy vals vals) => Sig a -> Sig (HList vals) -> Sig (HList (Value a ': vals))
 prepend (x ::: xs) (y ::: ys) = 
-  (HCons (Current (Just' x) x) y) ::: never -- prependAwait x xs y ys
+  (HCons (Current (Just' x) x) y) ::: prependAwait x xs y ys
 
 
-prependAwait :: (Stable a, Stable l, l ~ HList vals ) => a -> O (Sig a) -> l -> O (Sig l) -> O (Sig (HList (Value a ': vals)))
+prependAwait :: (Stable a, Stable l, l ~ HList vals, Nothingfy vals vals) => a -> O (Sig a) -> l -> O (Sig l) -> O (Sig (HList (Value a ': vals)))
 prependAwait x xs y ys  = delay (
   case select xs ys of
-     Fst (x' ::: xs')   ys'         -> (Current (Just' x') x' `HCons` makeNothings y) ::: prependAwait x' xs' y ys'
-     Snd xs' (y' ::: ys')           -> (Current Nothing' x `HCons` y') ::: prependAwait x xs' y' ys'
-     Both (x' ::: xs') (y' ::: ys') -> (Current (Just' x') x' `HCons` y')  ::: prependAwait x' xs' y' ys')
+     Fst (x' ::: xs')   ys'         -> (Current (Just' x') x' %: makeNothings y) ::: prependAwait x' xs' y ys'
+     Snd xs' (y' ::: ys')           -> (Current Nothing' x %: y') ::: prependAwait x xs' y' ys'
+     Both (x' ::: xs') (y' ::: ys') -> (Current (Just' x') x' %: y')  ::: prependAwait x' xs' y' ys')
 
 
 singleton' :: (Stable a) => Sig a -> Sig (HList (Map Value '[a])) -- (Sig (HList (Map Value xs))) - Gives a type error
 singleton' xs = map (box (\p -> (Current (Just' p) p) %: HNil)) xs
-
--- -- Flatten as a recursive function
--- flattenToSignal' :: AllStable as => HList (Map Sig as) -> Sig (HList (Map Value as))
--- flattenToSignal' HNil = undefined
--- flattenToSignal' (HCons head HNil) = singleton' head
--- flattenToSignal' (HCons head tail) = prepend head (flattenToSignal' tail) 
-
--- -- Gives error: "could not deduce ‘x ~ Sig a3’ from the context: Map Sig xs ~ (x : xs4)" on "head" and "tail"
--- flattenToSignal :: AllStable as => HList (Map Sig as) -> Sig (HList (Map Value as))
--- flattenToSignal (HCons head tail) = prepend head (flattenToSignal' tail) 
-
--- prepend :: (Stable a, AllStable as) => Sig a -> Sig (HList (Map Value as)) -> Sig (HList (Map Value (a ': as)))
--- prepend (x ::: xs) (y ::: ys) = 
---   (HCons (Current (Just' x) x) y) ::: never --prependAwait x xs y ys
-
--- Outcommented prependAwait. We need "flattenToSignal" and "prepend" to work first
-
--- prependAwait :: (Stable a, AllStable as) => a -> O (Sig a) -> HList (Map Value as) -> O (Sig (HList (Map Value as))) -> O (Sig (HList (Map Value (a ': as))))
--- prependAwait x xs y ys  = delay (
---   case select xs ys of
---      Fst (x' ::: xs')   ys'         -> (Current (Just' x') x' %: mapH (\(Current _ x) -> Current Nothing' x) y) ::: prependAwait x' xs' y ys'
---      Snd xs' (y' ::: ys')           -> (Current Nothing' x %: y') ::: prependAwait x xs' y' ys'
---      Both (x' ::: xs') (y' ::: ys') -> (Current (Just' x') x' %: y') ::: prependAwait x' xs' y' ys')

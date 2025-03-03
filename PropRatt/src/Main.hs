@@ -5,33 +5,25 @@ import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
 import AsyncRattus.Signal hiding (mkSig)
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith, take)
-import Test.QuickCheck (Gen, Arbitrary (arbitrary))
-import Test.QuickCheck.Gen (generate)
-import PropRatt.Generators ()
 import PropRatt.Value
+import PropRatt.AsyncRat
 -- import PropRatt.AsyncRat (flattenToSignal, flattenToSignal', aRatSwitch, prepend)
 import PropRatt.Utilities (getLater)
 
 -- make list of n+1 arbitrary signals
-makeN :: Int -> IO (List (Sig Int))
-makeN 0 = do
-    arb <- generate (arbitrary :: Gen (Sig Int))
-    return (singleton arb)
-makeN x = do
-    h <- generate (arbitrary :: Gen (Sig Int))
-    t <- makeN (x-1)
-    return (h :! t)
+
 
 instance Stable Int where
 
-take :: List a -> Int -> a
-take (h :! t) n
-    | n <= 1 = h
-    | otherwise = take t (n-1)
-
 main :: IO ()
 main = do
-    -- signals <- makeN 1
+    ex <- example
+    print $ show $ first ex
+    print $ show $ second ex
+    print $ show $ third ex
+    
+    print $ show (flatten ex)
+    -- ssignals <- makeN 1
     -- let switched = aRatSwitch (take signals 1) (getLater (take signals 2))
     -- let twoSig = flattenToSignal' signals
     -- let added = prepend switched twoSig

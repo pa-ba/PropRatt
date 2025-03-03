@@ -2,27 +2,22 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Eta reduce" #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+
 
 -- AsyncRattus code goes here. 
 -- The code is type checked by the AsyncRattus compiler plugin.
 
-module PropRatt.AsyncRat (
-    aRatZip,
-    aRatSwitch,
-    aRatParallel,
-) where
+module PropRatt.AsyncRat where
 
 import AsyncRattus.Plugin.Annotation
 import AsyncRattus.Signal hiding (mkSig)
@@ -30,6 +25,10 @@ import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Value
+import Data.Proxy
+import PropRatt.Generators ()
+import Test.QuickCheck.Gen (generate)
+import Test.QuickCheck (Gen, Arbitrary (arbitrary))
 import Data.Kind (Type)
 
 
@@ -41,8 +40,6 @@ aRatSwitch a o = switch a o
 
 aRatParallel :: Sig a -> Sig b -> Sig (Maybe' a :* Maybe' b)
 aRatParallel a b = parallel a b
-
-
 
 
 -- strict HList
@@ -95,10 +92,20 @@ class Stable (HList vals) => Flatten sigs vals | sigs -> vals, vals -> sigs wher
 class Stable (HList vals1) => Nothingfy vals1 vals2 where
   makeNothings :: HList vals1 -> HList vals2
 
-instance Stable a => Flatten '[Sig a] '[Value a] where
+first :: HList (a ': _) -> a
+first (HCons h t) = h
+
+second :: HList (_ ': a ': _) -> a
+second (HCons _ (HCons h2 _)) = h2
+
+third :: HList (_ ': _ ': a ': _) -> a
+third (HCons _ (HCons _ (HCons h3 _))) = h3
+
+
+instance  {-# OVERLAPPING #-} Stable a => Flatten '[Sig a] '[Value a] where
   flatten (HCons head HNil) = singleton' head
 
-instance (Stable a, Flatten sigs vals, Nothingfy vals vals) => Flatten (Sig a ': sigs) (Value a ': vals) where
+instance   (Stable a, Flatten sigs vals, Nothingfy vals vals) => Flatten (Sig a ': sigs) (Value a ': vals) where
   flatten (HCons head tail) = prepend head (flatten tail)
 
 instance Stable a => Nothingfy '[Value a] '[Value a] where
@@ -123,3 +130,19 @@ prependAwait x xs y ys  = delay (
 
 singleton' :: (Stable a) => Sig a -> Sig (HList (Map Value '[a])) -- (Sig (HList (Map Value xs))) - Gives a type error
 singleton' xs = map (box (\p -> (Current (Just' p) p) %: HNil)) xs
+
+-- makeN :: Int -> IO (HList (Sig Int ': as))
+-- makeN 0 = do
+--     arb <- generate (arbitrary :: Gen (Sig Int))
+--     return (singleton' arb)
+-- makeN x = do
+--     h <- generate (arbitrary :: Gen (Sig Int))
+--     t <- makeN (x-1)
+--     return (h %: t)
+
+example :: IO (HList '[Sig Int, Sig Int, Sig Int])
+example = do
+  first <- generate (arbitrary :: Gen (Sig Int))
+  second <- generate (arbitrary :: Gen (Sig Int))
+  third <- generate (arbitrary :: Gen (Sig Int))
+  return (first %: second %: third %: HNil)

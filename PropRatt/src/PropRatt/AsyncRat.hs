@@ -25,10 +25,8 @@ import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Value
-import Data.Proxy
-import PropRatt.Generators ()
-import Test.QuickCheck.Gen (generate)
-import Test.QuickCheck (Gen, Arbitrary (arbitrary))
+import PropRatt.Generators 
+import Test.QuickCheck (Gen, Arbitrary (arbitrary), generate)
 import Data.Kind (Type)
 
 
@@ -57,31 +55,12 @@ infixr 5 %:
 (%:) :: x -> HList xs -> HList (x ': xs)
 (%:) = HCons
 
-class Apply f a b where
-  apply :: f -> a -> b
-
 instance (Show x, (Show (HList xs))) => Show (HList (x ': xs)) where
   show (HCons x xs) = show x ++ " %: " ++ show xs 
-
-class MapH f xs ys where
-  mapH :: f -> HList xs -> HList ys
-
-instance MapH f '[] '[] where
-   mapH _ _ = HNil
-
-instance (Apply f x y, MapH f xs ys) => MapH f (x ': xs) (y ': ys) where
-  mapH f (HCons x xs) = apply f x %: mapH f xs
 
 type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
   Map f '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
-
-
--- class AllStable (as :: [Type]) where 
-
--- instance AllStable '[] where
-
--- instance (Stable a, AllStable as) => AllStable (a ': as) where
 
 instance Stable (HList '[]) where
 instance (Stable a, Stable (HList as)) => Stable (HList (a ': as)) where
@@ -102,23 +81,21 @@ third :: HList (_ ': _ ': a ': _) -> a
 third (HCons _ (HCons _ (HCons h3 _))) = h3
 
 
-instance  {-# OVERLAPPING #-} Stable a => Flatten '[Sig a] '[Value a] where
+instance {-# OVERLAPPING #-} Stable a => Flatten '[Sig a] '[Value a] where
   flatten (HCons head HNil) = singleton' head
 
-instance   (Stable a, Flatten sigs vals, Nothingfy vals vals) => Flatten (Sig a ': sigs) (Value a ': vals) where
+instance (Stable a, Flatten sigs vals, Nothingfy vals vals) => Flatten (Sig a ': sigs) (Value a ': vals) where
   flatten (HCons head tail) = prepend head (flatten tail)
 
-instance Stable a => Nothingfy '[Value a] '[Value a] where
+instance {-# OVERLAPPING #-} Stable a => Nothingfy '[Value a] '[Value a] where
   makeNothings (HCons (Current x y) HNil) = Current Nothing' y %: HNil
 
 instance (Stable a, Nothingfy as as) => Nothingfy (Value a ': as) (Value a ': as) where
   makeNothings (HCons (Current x y) tail) = Current Nothing' y %: makeNothings tail
 
-
 prepend :: (Stable a, Flatten sigs vals, Nothingfy vals vals) => Sig a -> Sig (HList vals) -> Sig (HList (Value a ': vals))
 prepend (x ::: xs) (y ::: ys) = 
   (HCons (Current (Just' x) x) y) ::: prependAwait x xs y ys
-
 
 prependAwait :: (Stable a, Stable l, l ~ HList vals, Nothingfy vals vals) => a -> O (Sig a) -> l -> O (Sig l) -> O (Sig (HList (Value a ': vals)))
 prependAwait x xs y ys  = delay (
@@ -128,21 +105,12 @@ prependAwait x xs y ys  = delay (
      Both (x' ::: xs') (y' ::: ys') -> (Current (Just' x') x' %: y')  ::: prependAwait x' xs' y' ys')
 
 
-singleton' :: (Stable a) => Sig a -> Sig (HList (Map Value '[a])) -- (Sig (HList (Map Value xs))) - Gives a type error
+singleton' :: (Stable a) => Sig a -> Sig (HList (Map Value '[a]))
 singleton' xs = map (box (\p -> (Current (Just' p) p) %: HNil)) xs
 
--- makeN :: Int -> IO (HList (Sig Int ': as))
--- makeN 0 = do
---     arb <- generate (arbitrary :: Gen (Sig Int))
---     return (singleton' arb)
--- makeN x = do
---     h <- generate (arbitrary :: Gen (Sig Int))
---     t <- makeN (x-1)
---     return (h %: t)
-
-example :: IO (HList '[Sig Int, Sig Int, Sig Int])
+example :: IO (HList '[Sig Bool, Sig Int, Sig Char])
 example = do
-  first <- generate (arbitrary :: Gen (Sig Int))
+  first <- generate (arbitrary :: Gen (Sig Bool))
   second <- generate (arbitrary :: Gen (Sig Int))
-  third <- generate (arbitrary :: Gen (Sig Int))
+  third <- generate (arbitrary :: Gen (Sig Char))
   return (first %: second %: third %: HNil)

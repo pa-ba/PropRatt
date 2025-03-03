@@ -14,6 +14,8 @@ import PropRatt.Utilities (getLater)
 
 
 instance Stable Int where
+instance Stable Char where
+instance Stable Bool where
 
 main :: IO ()
 main = do

@@ -108,9 +108,8 @@ prependAwait x xs y ys  = delay (
 singleton' :: (Stable a) => Sig a -> Sig (HList (Map Value '[a]))
 singleton' xs = map (box (\p -> (Current (Just' p) p) %: HNil)) xs
 
-example :: IO (HList '[Sig Bool, Sig Int, Sig Char])
+example :: IO (HList '[Sig Int, Sig Int])
 example = do
-  first <- generate (arbitrary :: Gen (Sig Bool))
+  first <- generate (arbitrary :: Gen (Sig Int))
   second <- generate (arbitrary :: Gen (Sig Int))
-  third <- generate (arbitrary :: Gen (Sig Char))
-  return (first %: second %: third %: HNil)
+  return (first %: second %: HNil)

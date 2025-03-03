@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# LANGUAGE TypeOperators, FlexibleInstances #-}
 module Main (main) where
 import PropRatt.LTL
 import AsyncRattus.Strict
@@ -12,89 +13,31 @@ import PropRatt.Utilities (getLater)
 
 -- make list of n+1 arbitrary signals
 
-
 instance Stable Int where
 instance Stable Char where
 instance Stable Bool where
+instance Stable (Int :* Int) where
 
 main :: IO ()
 main = do
     ex <- example
-    print $ show $ first ex
-    print $ show $ second ex
-    print $ show $ third ex
+    --print $ show $ first ex
+    --print $ show $ second ex
     
-    print $ show (flatten ex)
-    -- ssignals <- makeN 1
-    -- let switched = aRatSwitch (take signals 1) (getLater (take signals 2))
-    -- let twoSig = flattenToSignal' signals
-    -- let added = prepend switched twoSig
-    -- print (evaluateLTLSigs (Until (Atom (\ls -> take ls 1 ?= take ls 2)) (Atom (\ls -> take ls 1 ?= take ls 3))) added)
-    -- print (evaluateLTL (Eventually (Implies (Atom odd) (Next (Atom (== 4))))) [2,2,2,3,4])
-    -- print (evaluateLTL (Eventually (Atom odd)) [2,2,2,2,2,2])
-    -- print (evaluateLTL (Implies
-    --                        (And (Eventually (Atom (odd))) (Always (Atom (>= 20)))) --false
-    --                        (Until (Atom (>= 20)) (Atom (== 50)))) -- false
-    --                    [0,0,0,23,19])
-    {- print (evaluateLTL (Or (
-                            Eventually (
-                                Implies (Atom id) (Always (Atom id))
-                            ))
-                            (
-                                Until (Not (Atom id)) (Atom id)
-                            ))
-                            [False,True,True]) -- Pre-order traversal of Fig 3.1, formula: (F (p -> G r) v (neg q U p)) -}
+    --print $ show (flatten ex)
+    let switched = aRatSwitch (first ex) (getLater (second ex))
+    let twoSig = flatten ex
+    let added = prepend switched twoSig
+    print (evaluateLTLSigs (Until (Now (\ls -> first ls ?= second ls)) (Now (\ls -> first ls ?= third ls))) added)
+    
 
-    -- Atoms:
-    -- p = Red light is activated
-    -- q = Yellow light is activated
-    -- r = Green light is activated
+    -- let s2 = first ex
+    -- let s3 = second ex
+    -- let s1 = aRatZip s2 s3
+    -- let flattened = flatten ex
+    -- let added2 = prepend s1 flattened
+    --print added2
 
-    -- States S = {s1,s2,s3,s4}
-    -- L(s1) = p
-    -- L(s2) = q
-    -- L(s3) = r
-    -- L(s4) = q
+    -- print (evaluateLTLSigs (Always (Or (Now (\n -> Current (Just' (fst' (current' (first n)))) 0 ?= second n)) (Now (\n -> Current (Just' (snd' (current' (first n)))) 0 ?= third n)))) added2)
 
-    -- Transitions
-    -- s1 -> s2
-    -- s2 -> s3
-    -- s3 -> s4
-    -- s4 -> s1
-
-    -- let goodList = ["Green", "Yellow", "Red", "Yellow", "Green", "Yellow"]
-    -- let badList = ["Yellow", "Yellow", "Red", "Green", "Green", "Yellow"]
-    -- let badList2 = ["Purple", "Purple", "Purple", "Purple", "Purple"]
-
-    -- Formulae
-    -- 1. A least one light is activated at all times (G (p v q v r))
-    -- print (evaluateLTL (Always (Or (Or (Atom (== "Green")) (Atom (== "Yellow"))) (Atom (== "Red")))) goodList)
-    -- 2. A light can never have two lights activated at once (requires concurrency, can do this with a list..)
-    -- 3. Red light is always followed by a yellow light (G (p -> X q))
-    -- print (evaluateLTL (Always (Implies (Atom (== "Red")) (Next (Atom (== "Yellow"))))) goodList)
-    -- 4. Yellow light is always followed by either a green or red light (G (q -> X (p v r)))
-    -- print (evaluateLTL (Always (Implies (Atom (== "Yellow")) (Next (Or (Atom (== "Red")) (Atom (== "Green")))))) goodList)
-    -- 5. Green light is always followed by a yellow light (G (r -> X q))
-    -- print (evaluateLTL (Always (Implies (Atom (== "Green")) (Next (Atom (== "Yellow"))))) goodList)
-    -- 6. A light eventuall turns green (G F p)
-    -- print (evaluateLTL (Eventually (Atom (== "Green"))) goodList)
-    -- 7. A light eventuall turns yellow (G F q)
-    -- print (evaluateLTL (Eventually (Atom (== "Yellow"))) goodList)
-    -- 8. A light eventuall turns red (G F r)
-    -- print (evaluateLTL (Eventually (Atom (== "Red"))) goodList)
-
-    -- print (evaluateLTL (Always (Or (Or (Atom (== "Green")) (Atom (== "Yellow"))) (Atom (== "Red")))) badList2) -- 1
-    -- print (evaluateLTL (Always (Implies (Atom (== "Red")) (Next (Atom (== "Yellow"))))) badList) -- 3
-    -- print (evaluateLTL (Always (Implies (Atom (== "Yellow")) (Next (Or (Atom (== "Red")) (Atom (== "Green")))))) badList) -- 4
-    -- print (evaluateLTL (Always (Implies (Atom (== "Green")) (Next (Atom (== "Yellow"))))) badList) -- 5
-    -- print (evaluateLTL (Always (Eventually (Atom (== "Green")))) badList2) -- 6
-    -- print (evaluateLTL (Always (Eventually (Atom (== "Yellow")))) badList2) -- 7
-    -- print (evaluateLTL (Always (Eventually (Atom (== "Red")))) badList2) -- 8
-
-    --print (evaluateLTLSig (Eventually (Atom (=< 10))) goodList) )
-
-    --let values = mkSig ints0
-    print ("hej")
- 
-    -- print (evaluateTupleSig (Always (Or (Atom2 (\a b -> fst a == fst b))) (Atom2 (\a b -> FST a == SND b))) ints0 ints1)
-    --print (evaluateTupleSig (Always2 (Atom2 (\s1 s2 s3 -> (fst' s1) ?= s2) `Or2` Atom2 (\s1 s2 s3 -> (snd' s1) ?= s3))) ints0 ints1)
+-- Value (Just' (1, 2)) (1, 2)

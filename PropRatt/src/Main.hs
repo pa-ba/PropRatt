@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# LANGUAGE TypeOperators, FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 module Main (main) where
 import PropRatt.LTL
 import AsyncRattus.Strict
@@ -26,7 +27,7 @@ example = do
   first <- generate (arbitrary :: Gen (Sig Int))
   second <- generate (arbitrary :: Gen (Sig Int))
   return (first %: second %: HNil)
-  
+
 main :: IO ()
 main = do
     ex <- example
@@ -37,8 +38,7 @@ main = do
     let switched = aRatSwitch (first ex) (getLater (second ex))
     let twoSig = flatten ex
     let added = prepend switched twoSig
-    print (evaluateLTLSigs (Until (Now (\ls -> first ls ?= second ls)) (Now (\ls -> first ls ?= third ls))) added)
-
+    print (evaluate (Until (Now (\ls -> first ls ?= second ls)) (Now (\ls -> first ls ?= third ls))) added)
 
     let s2 = first ex
     let s3 = second ex
@@ -47,4 +47,4 @@ main = do
     let added2 = prepend s1 flattened
     --print added2
 
-    print (evaluateLTLSigs (Always (Or (Now (\hls -> (fst' (current' $ first hls) :: Int) == (current' (second hls) :: Int))) (Now (\hls -> (snd' (current' $ first hls) :: Int) == (current' (third hls) :: Int))))) added2)
+    print (evaluate (Always (Or (Now (\hls -> (fst' (current' $ first hls) :: Int) == (current' (second hls) :: Int))) (Now (\hls -> (snd' (current' $ first hls) :: Int) == (current' (third hls) :: Int))))) added2)

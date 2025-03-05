@@ -1,7 +1,6 @@
 {-# OPTIONS -fplugin=AsyncRattus.Plugin #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -9,11 +8,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module PropRatt.AsyncRat where
 import AsyncRattus.Signal hiding (mkSig)
@@ -22,7 +21,7 @@ import AsyncRattus.InternalPrimitives
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Value
 import Data.Kind (Type)
-import Data.Data (Proxy (Proxy))
+import Test.QuickCheck (Arbitrary (arbitrary), Gen)
 
 aRatZip :: Sig Int -> Sig Int -> Sig (Int :* Int)
 aRatZip a b = zip a b
@@ -48,28 +47,39 @@ infixr 5 %:
 instance (Show x, (Show (HList xs))) => Show (HList (x ': xs)) where
   show (HCons x xs) = show x ++ " %: " ++ show xs
 
+instance Stable (HList '[]) where
+instance (Stable a, Stable (HList as)) => Stable (HList (a ': as)) where
+
 type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
   Map f '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
 
-instance Stable (HList '[]) where
-instance (Stable a, Stable (HList as)) => Stable (HList (a ': as)) where
+class HListGen (ts :: [Type]) where
+  generateHList :: Gen (HList (Map Sig ts))
 
-class Stable (HList v) => Flatten sigs v | sigs -> v, v -> sigs where
-  flatten :: HList sigs -> Sig (HList v)
+instance HListGen '[] where
+  generateHList = return HNil
 
--- single parameter typeclass one type argument
+instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
+  generateHList = do
+    x <- arbitrary
+    xs <- generateHList @ts
+    return (x %: xs)
+
+class Stable (HList v) => Flatten s v | s -> v, v -> s where
+  flatten :: HList s -> Sig (HList v)
+
 class Nothingfy a where
   toNothing :: HList a -> HList a
 
 instance {-# OVERLAPPING #-} Stable a => Flatten '[Sig a] '[Value a] where
   flatten (HCons h HNil) = singleton' h
 
-instance (Stable a, Flatten sigs v, Nothingfy v) => Flatten (Sig a ': sigs) (Value a ': v) where
+instance (Stable a, Flatten as v, Nothingfy v) => Flatten (Sig a ': as) (Value a ': v) where
   flatten (HCons h t) = prepend h (flatten t)
 
-instance {-# OVERLAPPING #-} Nothingfy '[Value a] where
-  toNothing (HCons (Current _ y) HNil) = Current Nothing' y %: HNil
+instance Nothingfy '[] where
+  toNothing _ =  HNil
 
 instance (Nothingfy as) => Nothingfy (Value a ': as) where
   toNothing (HCons (Current _ y) t) = Current Nothing' y %: toNothing t
@@ -102,3 +112,6 @@ prependAwait x xs y ys  = delay (
 
 singleton' :: Sig a -> Sig (HList (Map Value '[a]))
 singleton' = map (box (\p -> Current (Just' p) p %: HNil))
+
+generateSigs :: forall (ts :: [Type]). HListGen ts => Gen (HList (Map Sig ts))
+generateSigs = generateHList @ts

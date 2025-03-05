@@ -15,19 +15,19 @@ import PropRatt.AsyncRat
 import Data.Kind
 
 data Pred (v :: [Type]) where
-  Tautology    :: Pred v
+  Tautology     :: Pred v
   Contradiction :: Pred v
-  Now         :: (HList v -> Bool) -> Pred v
-  Not         :: Pred v -> Pred v
-  And         :: Pred v -> Pred v -> Pred v
-  Or          :: Pred v -> Pred v -> Pred v
-  Until       :: Pred v -> Pred v -> Pred v
-  Next        :: Pred v -> Pred v
-  Implies     :: Pred v -> Pred v -> Pred v
-  Always      :: Pred v -> Pred v
-  Eventually  :: Pred v -> Pred v
-  After       :: Int -> Pred v -> Pred v
-  Release     :: Pred v -> Pred v -> Pred v
+  Now           :: (HList v -> Bool) -> Pred v
+  Not           :: Pred v -> Pred v
+  And           :: Pred v -> Pred v -> Pred v
+  Or            :: Pred v -> Pred v -> Pred v
+  Until         :: Pred v -> Pred v -> Pred v
+  Next          :: Pred v -> Pred v
+  Implies       :: Pred v -> Pred v -> Pred v
+  Always        :: Pred v -> Pred v
+  Eventually    :: Pred v -> Pred v
+  After         :: Int -> Pred v -> Pred v
+  Release       :: Pred v -> Pred v -> Pred v
 
 evaluate' :: Int -> Pred v -> Sig (HList v) -> Bool
 evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =

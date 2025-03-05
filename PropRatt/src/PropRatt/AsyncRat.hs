@@ -58,26 +58,22 @@ instance (Stable a, Stable (HList as)) => Stable (HList (a ': as)) where
 class Stable (HList v) => Flatten sigs v | sigs -> v, v -> sigs where
   flatten :: HList sigs -> Sig (HList v)
 
-class Nothingfy a b where
-  toNothing :: HList a -> HList b
+-- single parameter typeclass one type argument
+class Nothingfy a where
+  toNothing :: HList a -> HList a
 
 instance {-# OVERLAPPING #-} Stable a => Flatten '[Sig a] '[Value a] where
-  flatten :: Stable a => HList '[Sig a] -> Sig (HList '[Value a])
   flatten (HCons h HNil) = singleton' h
 
-instance (Stable a, Flatten sigs v, Nothingfy v v) => Flatten (Sig a ': sigs) (Value a ': v) where
-  flatten :: (Stable a, Flatten sigs v, Nothingfy v v) => HList (Sig a : sigs) -> Sig (HList (Value a : v))
+instance (Stable a, Flatten sigs v, Nothingfy v) => Flatten (Sig a ': sigs) (Value a ': v) where
   flatten (HCons h t) = prepend h (flatten t)
 
-instance {-# OVERLAPPING #-} Nothingfy '[Value a] '[Value a] where
-  toNothing :: HList '[Value a] -> HList '[Value a]
+instance {-# OVERLAPPING #-} Nothingfy '[Value a] where
   toNothing (HCons (Current _ y) HNil) = Current Nothing' y %: HNil
 
-instance (Nothingfy as as) => Nothingfy (Value a ': as) (Value a ': as) where
-  toNothing :: Nothingfy as as => HList (Value a : as) -> HList (Value a : as)
+instance (Nothingfy as) => Nothingfy (Value a ': as) where
   toNothing (HCons (Current _ y) t) = Current Nothing' y %: toNothing t
 
--- TODO generalize?? perhaps make safe to use for empty hlist
 first :: HList (a ': _) -> a
 first (HCons h _) = h
 
@@ -93,11 +89,11 @@ fourth (HCons _ (HCons _ (HCons _ (HCons h4 _)))) = h4
 fifth :: HList (_ ': _ ': _ ': _ ': a ': _) -> a
 fifth (HCons _ (HCons _ (HCons _ (HCons _ (HCons h5 _))))) = h5
 
-prepend :: (Stable a, Stable (HList v), Nothingfy v v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
+prepend :: (Stable a, Stable (HList v), Nothingfy v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
 prepend (x ::: xs) (y ::: ys) =
   HCons (Current (Just' x) x) y ::: prependAwait x xs y ys
 
-prependAwait :: (Stable a, Stable ls, ls ~ HList v, Nothingfy v v) => a -> O (Sig a) -> ls -> O (Sig ls) -> O (Sig (HList (Value a ': v)))
+prependAwait :: (Stable a, Stable ls, ls ~ HList v, Nothingfy v) => a -> O (Sig a) -> ls -> O (Sig ls) -> O (Sig (HList (Value a ': v)))
 prependAwait x xs y ys  = delay (
   case select xs ys of
      Fst (x' ::: xs')   ys'         -> (Current (Just' x') x' %: toNothing y) ::: prependAwait x' xs' y ys'

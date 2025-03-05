@@ -58,30 +58,5 @@ evaluateLTLSigs' amountOfPredCap formulae sig@(x ::: Delay cl f) =
     evaluate = evaluateLTLSigs' amountOfPredCap
     smallest = IntSet.findMin
 
-
--- Example 1:
-
--- s1 = zip xs ys
--- s2 = xs
--- s3 = ys
-
--- G (fst (Value s1) = Value s2 \/ snd (Value s1) = Value s3)
-
--- Example 2:
-
--- s1 = switch xs ys cl (1,2,3)
--- s2 = xs cl (2,3)
--- s3 = 0 ::: ys cl (1)
-
--- Until (Value s1 = Value s2) (Value s1 = Value ys)
-
-
--- evaluateLTL :: Pred sigs -> [sigs] -> Bool
--- evaluateLTL = evaluateLTL' 4
-
--- evaluateLTLSig :: (Stable sigs) => Pred sigs -> Sig sigs -> Bool
--- evaluateLTLSig = evaluateLTLSig' 10
-
-
 evaluateLTLSigs :: forall (sigs :: [*]) (vals :: [*]). Pred sigs vals -> Sig (HList vals) -> Bool
-evaluateLTLSigs = evaluateLTLSigs' 10
+evaluateLTLSigs = evaluateLTLSigs' 20

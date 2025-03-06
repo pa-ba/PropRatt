@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS -fplugin=AsyncRattus.Plugin #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# LANGUAGE TypeOperators, FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
@@ -15,6 +15,8 @@ import Test.QuickCheck (generate)
 
 main :: IO ()
 main = do
+    let ex = example
+    print $ unWrap ex
     intSignals <- generate $ generateSigs @[Int, Int]
     let switched = aRatSwitch (first intSignals) (getLater (second intSignals))
     let signalsUnderTest = prepend switched $ flatten intSignals

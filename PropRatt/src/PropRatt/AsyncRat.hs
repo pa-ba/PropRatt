@@ -72,10 +72,10 @@ instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
 class Stable (HList v) => Flatten s v | s -> v, v -> s where
   flatten :: HList s -> Sig (HList v)
 
-instance {-# OVERLAPPING #-} Stable a => Flatten '[Sig a] '[Value a] where
+instance {-# OVERLAPPING #-} (Stable a, Stable (Value a)) => Flatten '[Sig a] '[Value a] where
   flatten (HCons h HNil) = singleton' h
 
-instance (Stable a Flatten as v, Falsify v) => Flatten (Sig a ': as) (Value a ': v) where
+instance (Stable a, Stable (Value a), Flatten as v, Falsify v) => Flatten (Sig a ': as) (Value a ': v) where
   flatten (HCons h t) = prepend h (flatten t)
 
 class Falsify a where

@@ -22,7 +22,7 @@ import Data.Data (Typeable)
 data Pred (v :: [Type]) where
   Tautology     :: Pred v
   Contradiction :: Pred v
-  Now           :: (HList v -> Bool) -> Pred v
+  Now           :: Atom v -> Pred v
   Not           :: Pred v -> Pred v
   And           :: Pred v -> Pred v -> Pred v
   Or            :: Pred v -> Pred v -> Pred v
@@ -34,6 +34,32 @@ data Pred (v :: [Type]) where
   After         :: Int -> Pred v -> Pred v
   Release       :: Pred v -> Pred v -> Pred v 
   
+data Atom (v :: [Type]) a where
+  Prior :: Value a -> a
+  First :: Atom (a ': _) -> Value a
+  Second :: Atom (_ ': a ': _) -> Value a
+  Eq :: Value a -> Value b -> Pred v
+  Le :: 
+  Ge :: 
+  --
+  --
+  --
+  --
+  --
+
+eval :: Atom v a -> Pred v
+eval atom = case atom of
+  | First hls = first hls
+
+packman b = if b then Tautology else Contradiction
+
+compare :: (a -> b -> Bool) -> Value a -> Value b -> Pred v
+comp f a1 a2 = 
+
+(??=) :: Value a -> Value b -> Bool v
+(??=) (Current _ (a :! as)) (Current _ (b :! bs)) = a == b
+
+
 isSafetyPredicate :: Pred v -> Bool
 isSafetyPredicate Tautology       = True
 isSafetyPredicate Contradiction   = True

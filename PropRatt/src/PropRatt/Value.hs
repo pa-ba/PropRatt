@@ -6,7 +6,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-
 module PropRatt.Value where
 import AsyncRattus.Strict
 import AsyncRattus.Signal hiding (current)
@@ -18,7 +17,7 @@ data Value a where
   Current :: !HasTicked -> !(List a) -> Value a
 
 instance Show a => Show (Value a) where
-  show (Current t h) = "Has ticked: " ++ show t ++ show h
+  show (Current t h) = show t ++ show h
 
 instance Show a => Show (Sig [Value a]) where
   show sig = "Sig [Value a]: " ++ show (takeSigExhaustive sig) ++ "..."

@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs, DataKinds, KindSignatures, MultiParamTypeClasses, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
+{-# LANGUAGE TypeOperators #-}
 
 module PropRatt.LTL
   ( Pred (..),
@@ -18,6 +19,7 @@ import qualified Data.IntSet as IntSet
 import PropRatt.AsyncRat
 import Data.Kind
 import Data.Data (Typeable)
+import PropRatt.Value
 
 data Pred (v :: [Type]) where
   Tautology     :: Pred v
@@ -34,30 +36,42 @@ data Pred (v :: [Type]) where
   After         :: Int -> Pred v -> Pred v
   Release       :: Pred v -> Pred v -> Pred v 
   
-data Atom (v :: [Type]) a where
-  Prior :: Value a -> a
-  First :: Atom (a ': _) -> Value a
-  Second :: Atom (_ ': a ': _) -> Value a
-  Eq :: Value a -> Value b -> Pred v
-  Le :: 
-  Ge :: 
-  --
-  --
-  --
-  --
-  --
+data Atom (v :: [Type]) where
+  Equal :: Value a -> Value b -> Atom v
+  Larger :: Value a -> Value b -> Atom v
+  Greater :: Value a -> Value b -> Atom v
 
-eval :: Atom v a -> Pred v
+  Prior :: (Atom (Value a ': as) -> Value a) -> Atom v -> Atom v
+  First :: Atom (v ': _)
+  Second :: Atom (Value a ': as) -> Value a -> Atom v
+  Third :: Atom (Value a ': as) -> Value a -> Atom v
+  Fourth :: Atom (Value a ': as) -> Value a -> Atom v
+  Fifth :: Atom (Value a ': as) -> Value a -> Atom v
+  Sixth :: Atom (Value a ': as) -> Value a -> Atom v
+
+eval :: Atom v -> Pred v
 eval atom = case atom of
-  | First hls = first hls
+  --Equal -> 
+  Prior selector hlist -> case selector hlist of 
+    (Current _ (_ :! a :! _)) -> a
+  First hls -> first hls
+  Second hls -> second hls
+  Third hls -> third hls
+  Fourth hls -> fourth hls
+  Fifth hls -> fifth hls
+  Sixth hls -> sixth hls
+  Seventh hls -> seventh hls
+  Eight hls -> eight hls
+  Ninth hls -> ninth hls
+
 
 packman b = if b then Tautology else Contradiction
 
-compare :: (a -> b -> Bool) -> Value a -> Value b -> Pred v
-comp f a1 a2 = 
+-- compare :: (a -> b -> Bool) -> Value a -> Value b -> Pred v
+-- comp f a1 a2 = 
 
-(??=) :: Value a -> Value b -> Bool v
-(??=) (Current _ (a :! as)) (Current _ (b :! bs)) = a == b
+-- (??=) :: Value a -> Value b -> Bool v
+-- (??=) (Current _ (a :! as)) (Current _ (b :! bs)) = a == b
 
 
 isSafetyPredicate :: Pred v -> Bool

@@ -102,6 +102,18 @@ fourth (HCons _ (HCons _ (HCons _ (HCons h4 _)))) = h4
 fifth :: HList (_ ': _ ': _ ': _ ': a ': _) -> a
 fifth (HCons _ (HCons _ (HCons _ (HCons _ (HCons h5 _))))) = h5
 
+sixth :: HList (_ ': _ ': _ ': _ ': _ ': a ': _) -> a
+sixth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h6 _)))))) = h6
+
+seventh :: HList (_ ':_ ': _ ': _ ': _ ': _ ': a ': _) -> a
+seventh (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h7 _))))))) = h7
+
+eight :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
+eight (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h8 _)))))))) = h8
+
+ninth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
+ninth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h9 _))))))))) = h9
+
 prepend :: (Stable a, Stable (HList v), Falsify v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
 prepend (x ::: xs) (y ::: ys) =
   HCons (Current (HasTicked True) (x :! Nil)) y ::: prependAwait (x :! Nil) xs y ys

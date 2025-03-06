@@ -36,19 +36,20 @@ data Pred (v :: [Type]) where
   After         :: Int -> Pred v -> Pred v
   Release       :: Pred v -> Pred v -> Pred v 
   
-data Atom (v :: [Type]) where
-  Equal :: Value a -> Value b -> Atom v
+data Atom (v :: [Type]) a where
+  Equal :: Value a -> Value b -> Atom v -- Atom v -> Atom v -> Atom v??
   Larger :: Value a -> Value b -> Atom v
   Greater :: Value a -> Value b -> Atom v
 
   Prior :: (Atom (Value a ': as) -> Value a) -> Atom v -> Atom v
-  First :: Atom (v ': _)
-  Second :: Atom (Value a ': as) -> Value a -> Atom v
-  Third :: Atom (Value a ': as) -> Value a -> Atom v
-  Fourth :: Atom (Value a ': as) -> Value a -> Atom v
-  Fifth :: Atom (Value a ': as) -> Value a -> Atom v
-  Sixth :: Atom (Value a ': as) -> Value a -> Atom v
+  First :: Atom (v ': _) a
+  Second :: Atom (_ ': v ': _) a
+  Third :: Atom (_ ': _ ': v ': _) a
+  Fourth :: Atom ( _ ': _ ': _ ': v ': _) a
+  Fifth :: Atom ( _ ': _ ': _ ':  _ ': v ': _) a
+  Sixth :: Atom ( _ ': _ ': _ ':  _ ': _ ': v ': _) a
 
+-- Maybe not eval?
 eval :: Atom v -> Pred v
 eval atom = case atom of
   --Equal -> 

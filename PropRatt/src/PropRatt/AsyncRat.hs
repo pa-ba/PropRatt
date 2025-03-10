@@ -13,6 +13,9 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Eta reduce" #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 module PropRatt.AsyncRat where
 import AsyncRattus.Signal hiding (mkSig)
@@ -22,6 +25,7 @@ import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith
 import PropRatt.Value
 import Data.Kind (Type)
 import Test.QuickCheck (Arbitrary (arbitrary), Gen)
+import qualified Data.IntSet as IntSet
 
 aRatZip :: Sig Int -> Sig Int -> Sig (Int :* Int)
 aRatZip a b = zip a b
@@ -69,6 +73,18 @@ type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
   Map f '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
 
+type family ToSig (f :: Type -> Type) (xs :: Type) :: [Type] where
+  ToSig f t = '[f t]
+
+class HListGen2 (ts :: Type) where
+  generateHList2 :: Gen (HList (ToSig Sig ts))
+
+instance (Arbitrary (Sig ts), HListGen2 ts) => HListGen2 ts where
+  generateHList2 = do
+    x <- arbitrary
+    return (x %: HNil)
+
+
 class HListGen (ts :: [Type]) where
   generateHList :: Gen (HList (Map Sig ts))
 
@@ -84,20 +100,20 @@ instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
 class Stable (HList v) => Flatten s v | s -> v, v -> s where
   flatten :: HList s -> Sig (HList v)
 
-class Nothingfy a where
-  toNothing :: HList a -> HList a
-
-instance {-# OVERLAPPING #-} Stable a => Flatten '[Sig a] '[Value a] where
+instance {-# OVERLAPPING #-} (Stable a, Stable (Value a)) => Flatten '[Sig a] '[Value a] where
   flatten (HCons h HNil) = singleton' h
 
-instance (Stable a, Flatten as v, Nothingfy v) => Flatten (Sig a ': as) (Value a ': v) where
+instance (Stable a, Stable (Value a), Flatten as v, Falsify v) => Flatten (Sig a ': as) (Value a ': v) where
   flatten (HCons h t) = prepend h (flatten t)
 
-instance Nothingfy '[] where
-  toNothing _ =  HNil
+class Falsify a where
+  toFalse :: HList a -> HList a
 
-instance (Nothingfy as) => Nothingfy (Value a ': as) where
-  toNothing (HCons (Current _ y) t) = Current Nothing' y %: toNothing t
+instance Falsify '[] where
+  toFalse _ =  HNil
+
+instance (Falsify as) => Falsify (Value a ': as) where
+  toFalse (HCons (Current _ y) t) = Current (HasTicked False) y %: toFalse t
 
 first :: HList (a ': _) -> a
 first (HCons h _) = h
@@ -114,19 +130,43 @@ fourth (HCons _ (HCons _ (HCons _ (HCons h4 _)))) = h4
 fifth :: HList (_ ': _ ': _ ': _ ': a ': _) -> a
 fifth (HCons _ (HCons _ (HCons _ (HCons _ (HCons h5 _))))) = h5
 
-prepend :: (Stable a, Stable (HList v), Nothingfy v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
-prepend (x ::: xs) (y ::: ys) =
-  HCons (Current (Just' x) x) y ::: prependAwait x xs y ys
+sixth :: HList (_ ': _ ': _ ': _ ': _ ': a ': _) -> a
+sixth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h6 _)))))) = h6
 
-prependAwait :: (Stable a, Stable ls, ls ~ HList v, Nothingfy v) => a -> O (Sig a) -> ls -> O (Sig ls) -> O (Sig (HList (Value a ': v)))
+seventh :: HList (_ ':_ ': _ ': _ ': _ ': _ ': a ': _) -> a
+seventh (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h7 _))))))) = h7
+
+eigth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
+eigth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h8 _)))))))) = h8
+
+ninth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
+ninth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h9 _))))))))) = h9
+
+prepend :: (Stable a, Stable (HList v), Falsify v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
+prepend (x ::: xs) (y ::: ys) =
+  HCons (Current (HasTicked True) (x :! Nil)) y ::: prependAwait (x :! Nil) xs y ys
+
+prependAwait :: (Stable a, Stable ls, ls ~ HList v, Falsify v) => List a -> O (Sig a) -> ls -> O (Sig ls) -> O (Sig (HList (Value a ': v)))
 prependAwait x xs y ys  = delay (
   case select xs ys of
-     Fst (x' ::: xs')   ys'         -> (Current (Just' x') x' %: toNothing y) ::: prependAwait x' xs' y ys'
-     Snd xs' (y' ::: ys')           -> (Current Nothing' x %: y') ::: prependAwait x xs' y' ys'
-     Both (x' ::: xs') (y' ::: ys') -> (Current (Just' x') x' %: y')  ::: prependAwait x' xs' y' ys')
+     Fst (x' ::: xs')   ys'         -> (Current (HasTicked True) (x' :! x) %: toFalse y) ::: prependAwait (x':!x) xs' y ys'
+     Snd xs' (y' ::: ys')           -> (Current (HasTicked False) x %: y') ::: prependAwait x xs' y' ys'
+     Both (x' ::: xs') (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y') ::: prependAwait (x':!x) xs' y' ys')
 
-singleton' :: Sig a -> Sig (HList (Map Value '[a]))
-singleton' = map (box (\p -> Current (Just' p) p %: HNil))
+singleton' ::  (Stable a) => Sig a -> Sig (HList (Map Value '[a]))
+singleton' sig = singleton'' sig Nil
+
+singleton'' :: (Stable a) => Sig a -> List a -> Sig (HList (Map Value '[a]))
+--singleton'' (h ::: never) acc = ((HCons (Current (HasTicked True) (h :! acc)) HNil) ::: motherNever)
+singleton'' (h ::: t@(Delay cl f)) acc = if IntSet.null cl 
+  then ((HCons (Current (HasTicked True) (h :! acc)) HNil) ::: motherNever) 
+  else (HCons (Current (HasTicked True) (h :! acc)) HNil) ::: delay (singleton'' (adv t) (h :! acc))
+
+motherNever :: O (Sig (HList (Map Value '[a])))
+motherNever = Delay IntSet.empty (error "Trying to adv on the 'never' delayed computation")
 
 generateSigs :: forall (ts :: [Type]). HListGen ts => Gen (HList (Map Sig ts))
 generateSigs = generateHList @ts
+
+generateSig :: forall (ts :: Type). HListGen2 ts => Gen (HList (ToSig Sig ts))
+generateSig = generateHList2 @ts

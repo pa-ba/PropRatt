@@ -157,7 +157,6 @@ singleton' ::  (Stable a) => Sig a -> Sig (HList (Map Value '[a]))
 singleton' sig = singleton'' sig Nil
 
 singleton'' :: (Stable a) => Sig a -> List a -> Sig (HList (Map Value '[a]))
---singleton'' (h ::: never) acc = ((HCons (Current (HasTicked True) (h :! acc)) HNil) ::: motherNever)
 singleton'' (h ::: t@(Delay cl f)) acc = if IntSet.null cl 
   then ((HCons (Current (HasTicked True) (h :! acc)) HNil) ::: motherNever) 
   else (HCons (Current (HasTicked True) (h :! acc)) HNil) ::: delay (singleton'' (adv t) (h :! acc))

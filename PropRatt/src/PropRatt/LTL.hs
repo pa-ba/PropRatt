@@ -8,7 +8,6 @@
 module PropRatt.LTL
   ( Pred (..),
     evaluate,
-    -- example,
     unWrap,
     Atom (..),
     LookUp (..)
@@ -45,7 +44,6 @@ data Atom (v :: [Type]) a where
   LargerThan :: LookUp v a -> LookUp v a -> Atom v a
   GreaterThan :: LookUp v a -> LookUp v a -> Atom v a
 
-
 data LookUp (v :: [Type]) a where 
   Prior :: LookUp v a -> LookUp v a
   First :: LookUp (Value a ': x) a
@@ -58,30 +56,61 @@ data LookUp (v :: [Type]) a where
   Eigth :: LookUp (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value a ': x8) a
   Ninth :: LookUp (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value a ': x9) a
 
--- -- Maybe not eval? YES
--- eval :: Atom v -> Pred v
--- eval atom = case atom of
---   --Equal -> 
---   Prior selector hlist -> case selector hlist of 
---     (Current _ (_ :! a :! _)) -> a
---   First hls -> first hls
---   Second hls -> second hls
---   Third hls -> third hls
---   Fourth hls -> fourth hls
---   Fifth hls -> fifth hls
---   Sixth hls -> sixth hls
---   Seventh hls -> seventh hls
---   Eight hls -> eight hls
---   Ninth hls -> ninth hls
+evaluate' :: (Ord a) => Int -> Pred v a -> Sig (HList v) -> Bool
+evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
+  timestepsLeft <= 0
+    || case formulae of
+         Now atom        -> evalAtom atom x
+         Not phi         -> not (eval phi sig)
+         And phi psi     -> eval phi sig && eval psi sig
+         Or phi psi      -> eval phi sig || eval psi sig
+         Until phi psi   -> eval psi sig
+                            || (eval phi sig && evaluateNext (phi `Until` psi) advance)
+         Next phi        -> evaluateNext phi advance
+         Implies phi psi -> not (eval phi sig && not (eval psi sig))
+         Always phi      -> eval phi sig && evaluateNext (Always phi) advance
+         Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
+                            && not (timestepsLeft == 1 && not (eval phi sig))
+         Release phi psi -> (eval psi sig && eval phi sig)
+                            || (eval psi sig && evaluateNext (phi `Until` psi) advance)
+         After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
+  where
+    evaluateNext = evaluate' (timestepsLeft - 1)
+    eval = evaluate' timestepsLeft
+    smallest = IntSet.findMin
+    advance = f (InputValue (smallest cl) ())
+
+evalAtom :: (Ord a) => Atom v a -> HList v -> Bool
+evalAtom a hl = case a of
+  Equals x y       -> evalLookUp x hl == evalLookUp y hl
+  LargerThan x y   -> evalLookUp x hl > evalLookUp y hl
+  GreaterThan x y  -> evalLookUp x hl < evalLookUp y hl
+
+evalLookUp :: (Ord a) => LookUp v a -> HList v -> Value a
+evalLookUp lu hl = case lu of
+  Prior f       -> 
+    let (Current b (_ :! v)) = evalLookUp f hl
+    in Current b v
+  First         -> first hl
+  Second        -> second hl
+  Third         -> third hl
+  Fourth       -> fourth hl
+  Fifth        -> fifth hl
+  Sixth        -> sixth hl
+  Seventh      -> seventh hl
+  Eigth        -> eigth hl
+  Ninth        -> ninth hl
+
+evaluate :: (Ord a) => Pred v a -> Sig (HList v) -> Bool
+evaluate = evaluate' 25
 
 
--- packman b = if b then Tautology else Contradiction
 
--- compare :: (a -> b -> Bool) -> Value a -> Value b -> Pred v
--- comp f a1 a2 = 
 
--- (??=) :: Value a -> Value b -> Bool v
--- (??=) (Current _ (a :! as)) (Current _ (b :! bs)) = a == b
+
+
+
+
 
 
 isSafetyPredicate :: Pred v a -> Bool
@@ -138,67 +167,8 @@ mkUntil = mkLivenessOp "Until"
 mkEventually = mkLivenessOp "Eventually"
 mkRelease = mkLivenessOp "Release"
 
--- Example usage:
--- Or (Now (Equals First Second) (Now (Equals First Third)))
--- example :: SafetyPred v a
--- example = do
---   let p = Now (Equals First Second)
---       q = Now (Equals First Third)
---      -- w = Now (Third (const False))
---   safeP <- mkSafePred (Or p q)
---   -- Attempting to add a liveness operator will cause an error:
---   _ <- mkAlways safeP
---   return safeP
 
 unWrap :: SafetyPred v a -> String
 unWrap s = case s of 
   Left s -> "err"
   Right s -> "no err"
-
-evaluate' :: (Ord a) => Int -> Pred v a -> Sig (HList v) -> Bool
-evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
-  timestepsLeft <= 0
-    || case formulae of
-         Now atom        -> evalAtom atom x
-         Not phi         -> not (eval phi sig)
-         And phi psi     -> eval phi sig && eval psi sig
-         Or phi psi      -> eval phi sig || eval psi sig
-         Until phi psi   -> eval psi sig
-                            || (eval phi sig && evaluateNext (phi `Until` psi) advance)
-         Next phi        -> evaluateNext phi advance
-         Implies phi psi -> not (eval phi sig && not (eval psi sig))
-         Always phi      -> eval phi sig && evaluateNext (Always phi) advance
-         Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
-                            && not (timestepsLeft == 1 && not (eval phi sig))
-         Release phi psi -> (eval psi sig && eval phi sig)
-                            || (eval psi sig && evaluateNext (phi `Until` psi) advance)
-         After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
-  where
-    evaluateNext = evaluate' (timestepsLeft - 1)
-    eval = evaluate' timestepsLeft
-    smallest = IntSet.findMin
-    advance = f (InputValue (smallest cl) ())
-
-evalAtom :: (Ord a) => Atom v a -> HList v -> Bool
-evalAtom a hl = case a of
-  Equals x y       -> evalLookUp x hl == evalLookUp y hl
-  LargerThan x y   -> evalLookUp x hl > evalLookUp y hl
-  GreaterThan x y  -> evalLookUp x hl < evalLookUp y hl
-
-evalLookUp :: (Ord a) => LookUp v a -> HList v -> Value a
-evalLookUp lu hl = case lu of
-  Prior f       -> 
-    let (Current b (_ :! v)) = evalLookUp f hl
-    in Current b v
-  First         -> first hl
-  Second        -> second hl
-  Third         -> third hl
-  Fourth       -> fourth hl
-  Fifth        -> fifth hl
-  Sixth        -> sixth hl
-  Seventh      -> seventh hl
-  Eigth        -> eigth hl
-  Ninth        -> ninth hl
-
-evaluate :: (Ord a) => Pred v a -> Sig (HList v) -> Bool
-evaluate = evaluate' 25

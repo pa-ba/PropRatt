@@ -21,8 +21,10 @@ main = do
     -- let ex = example
     -- print $ unWrap ex
     intSignals <- generate $ generateSigs @[Int, Int]
+    --print intSignals
     let switched = aRatSwitch (first intSignals) (getLater (second intSignals))
     let signalsUnderTest = prepend switched $ flatten intSignals
+    --print signalsUnderTest
     print (evaluate (Until (Now (Equals First Second)) (Now (Equals First Third))) signalsUnderTest)
 
     -- let s1 = aRatZip (first intSignals) (second intSignals)
@@ -37,8 +39,14 @@ main = do
     -- print (evaluate (Always (Or (Now (\hls -> (current' $ first hls) == (current' $ second hls))) (Now (\hls -> (current' $ first hls) == 10)))) signalsUnderTest3)
 
     -- Buffer: Now for original signal equals next in returned signal? we need history to test this property!
-    let bufferedSig = aRatBuffer 10 (first intSignals)
-    let signalsUnderTest4 = prepend bufferedSig $ flatten intSignals
+    -- intSig <- generate $ generateSigs @[Int]
+    intSig <- generate $ generateSig @Int
+
+    let bufferedSig = aRatBuffer 10 (first intSig)
+    --print bufferedSig
+    --print intSig
+    let signalsUnderTest4 = prepend bufferedSig $ flatten intSig
+    --print signalsUnderTest4
     print (evaluate (Next (Always (Now (Equals First (Prior Second))))) signalsUnderTest4)
 
     -- -- Interleave property (Either value is equal to sig 1 or sig 2 or value is the result of the function provided) 

@@ -25,6 +25,7 @@ import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith
 import PropRatt.Value
 import Data.Kind (Type)
 import Test.QuickCheck (Arbitrary (arbitrary), Gen)
+import qualified Data.IntSet as IntSet
 
 aRatZip :: Sig Int -> Sig Int -> Sig (Int :* Int)
 aRatZip a b = zip a b
@@ -71,6 +72,18 @@ instance (Stable a, Stable (HList as)) => Stable (HList (a ': as)) where
 type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
   Map f '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
+
+type family ToSig (f :: Type -> Type) (xs :: Type) :: [Type] where
+  ToSig f t = '[f t]
+
+class HListGen2 (ts :: Type) where
+  generateHList2 :: Gen (HList (ToSig Sig ts))
+
+instance (Arbitrary (Sig ts), HListGen2 ts) => HListGen2 ts where
+  generateHList2 = do
+    x <- arbitrary
+    return (x %: HNil)
+
 
 class HListGen (ts :: [Type]) where
   generateHList :: Gen (HList (Map Sig ts))
@@ -138,10 +151,22 @@ prependAwait x xs y ys  = delay (
   case select xs ys of
      Fst (x' ::: xs')   ys'         -> (Current (HasTicked True) (x' :! x) %: toFalse y) ::: prependAwait (x':!x) xs' y ys'
      Snd xs' (y' ::: ys')           -> (Current (HasTicked False) x %: y') ::: prependAwait x xs' y' ys'
-     Both (x' ::: xs') (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y')  ::: prependAwait (x':!x) xs' y' ys')
+     Both (x' ::: xs') (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y') ::: prependAwait (x':!x) xs' y' ys')
 
-singleton' :: Sig a -> Sig (HList (Map Value '[a]))
-singleton' = map (box (\p -> Current (HasTicked True) (p :! Nil) %: HNil))
+singleton' ::  (Stable a) => Sig a -> Sig (HList (Map Value '[a]))
+singleton' sig = singleton'' sig Nil
+
+singleton'' :: (Stable a) => Sig a -> List a -> Sig (HList (Map Value '[a]))
+--singleton'' (h ::: never) acc = ((HCons (Current (HasTicked True) (h :! acc)) HNil) ::: motherNever)
+singleton'' (h ::: t@(Delay cl f)) acc = if IntSet.null cl 
+  then ((HCons (Current (HasTicked True) (h :! acc)) HNil) ::: motherNever) 
+  else (HCons (Current (HasTicked True) (h :! acc)) HNil) ::: delay (singleton'' (adv t) (h :! acc))
+
+motherNever :: O (Sig (HList (Map Value '[a])))
+motherNever = Delay IntSet.empty (error "Trying to adv on the 'never' delayed computation")
 
 generateSigs :: forall (ts :: [Type]). HListGen ts => Gen (HList (Map Sig ts))
 generateSigs = generateHList @ts
+
+generateSig :: forall (ts :: Type). HListGen2 ts => Gen (HList (ToSig Sig ts))
+generateSig = generateHList2 @ts

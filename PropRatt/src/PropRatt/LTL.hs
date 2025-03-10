@@ -201,4 +201,4 @@ evalLookUp lu hl = case lu of
   Ninth        -> ninth hl
 
 evaluate :: (Ord a) => Pred v a -> Sig (HList v) -> Bool
-evaluate = evaluate' 20
+evaluate = evaluate' 25

@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, UndecidableInstances #-}
 
 module PropRatt.Value where
 import AsyncRattus.Strict
@@ -21,6 +21,15 @@ instance Show a => Show (Value a) where
 
 instance Show a => Show (Sig [Value a]) where
   show sig = "Sig [Value a]: " ++ show (takeSigExhaustive sig) ++ "..."
+
+instance Ord a => Ord (Value a) where 
+  (Current b1 (a1 :! xs)) `compare` (Current b2 (a2 :! ys)) = a1 `compare` a2
+
+instance Eq a => Eq (Value a) where
+  (Current _ Nil) == (Current _ Nil) = True
+  (Current _ Nil) == _ = False
+  _ == (Current _ Nil) = False
+  (Current b1 (a1 :! xs)) == (Current b2 (a2 :! ys)) = a1 == a2
 
 current' :: Value a -> a
 current' (Current _ (h :! _)) = h

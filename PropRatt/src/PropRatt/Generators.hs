@@ -17,7 +17,7 @@ import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith
 
 instance (Arbitrary a) => Arbitrary (Sig a) where
   arbitrary = do
-    len <- choose (20, 50)
+    len <- choose (30, 50)
     arbitrarySig len
 
 instance (Show a) => Show (Sig a) where

@@ -96,5 +96,5 @@ isEventuallyEqual (_ ::: Delay clx fx) (Delay cly fy)
     union = IntSet.union clx cly
     smallest = IntSet.findMin union
 
-getLater :: Sig Int -> O (Sig Int)
+getLater :: Sig a -> O (Sig a)
 getLater (_ ::: xs) = xs

@@ -35,6 +35,21 @@ aRatSwitch a o = switch a o
 aRatParallel :: Sig a -> Sig b -> Sig (Maybe' a :* Maybe' b)
 aRatParallel a b = parallel a b
 
+jumpFunc :: Int -> Maybe' (Sig Int)
+jumpFunc x = if x > 5 then Nothing' else (Just' (10 ::: never))
+
+aRatJump :: Box (a -> Maybe' (Sig a)) -> Sig a -> Sig a 
+aRatJump f sig = jump f sig
+
+aRatBuffer :: Stable a => a -> Sig a -> Sig a
+aRatBuffer a x = buffer a x
+
+interleaveFunc :: Int -> Int -> Int
+interleaveFunc a1 a2 = a1 * a2 + 2
+
+aRatInterleave :: Box (a -> a -> a) -> O (Sig a) -> O (Sig a) -> O (Sig a)
+aRatInterleave f x y = interleave f x y
+
 data HList :: [Type] -> Type where
   HNil :: HList '[]
   HCons :: !x -> !(HList xs) -> HList (x ': xs)
@@ -108,8 +123,8 @@ sixth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h6 _)))))) = h6
 seventh :: HList (_ ':_ ': _ ': _ ': _ ': _ ': a ': _) -> a
 seventh (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h7 _))))))) = h7
 
-eight :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
-eight (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h8 _)))))))) = h8
+eigth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
+eigth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h8 _)))))))) = h8
 
 ninth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
 ninth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h9 _))))))))) = h9

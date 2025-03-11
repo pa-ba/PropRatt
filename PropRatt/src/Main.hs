@@ -18,12 +18,7 @@ instance Stable (Value a) where
 
 main :: IO ()
 main = do
-    -- Switch example
-    intSignals <- generate $ generateSignals @[Int, Int]
-    let switched = aRatSwitch (first intSignals) (getLater (second intSignals))
-    let signalsUnderTest = prepend switched $ flatten intSignals
-    print (evaluate (Until (Now (Equals First Second)) (Now (Equals First Third))) signalsUnderTest)
-
+    print "hej"
     -- Zip example
     -- let s1 = aRatZip (first intSignals) (second intSignals)
     -- let signalsUnderTest2 = prepend s1 $ flatten intSignals
@@ -33,12 +28,6 @@ main = do
     -- let jumpedSig = aRatJump (box jumpFunc) (first intSignals)
     -- let signalsUnderTest3 = prepend jumpedSig $ flatten intSignals
     -- print (evaluate (Always (Or (Now (\hls -> (current' $ first hls) == (current' $ second hls))) (Now (\hls -> (current' $ first hls) == 10)))) signalsUnderTest3)
-
-    -- Buffer: Now for original signal equals next in returned signal? we need history to test this property!
-    intSig <- generate $ generateSignals @Int
-    let bufferedSig = aRatBuffer 10 (first intSig)
-    let signalsUnderTest4 = prepend bufferedSig $ flatten intSig
-    print (evaluate (Next (Always (Now (Equals First (Prior Second))))) signalsUnderTest4)
 
     -- -- Interleave property (Either value is equal to sig 1 or sig 2 or value is the result of the function provided) 
     -- let interleavedSig = aRatInterleave (box interleaveFunc) (getLater $ first intSignals) (getLater $ second intSignals)

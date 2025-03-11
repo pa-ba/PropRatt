@@ -25,7 +25,7 @@ import AsyncRattus.InternalPrimitives
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Value
 import Data.Kind (Type)
-import Test.QuickCheck (Arbitrary (arbitrary), Gen)
+import Test.QuickCheck (Arbitrary (arbitrary), Gen, resize)
 import qualified Data.IntSet as IntSet
 
 aRatZip :: Sig Int -> Sig Int -> Sig (Int :* Int)
@@ -161,7 +161,7 @@ instance HListGen '[] where
 
 instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
   generateHList = do
-    x  <- arbitrary
+    x  <- arbitrary :: Gen (Sig t)
     xs <- generateHList @ts
     return (x %: xs)
 

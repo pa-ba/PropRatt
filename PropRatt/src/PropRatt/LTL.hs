@@ -138,15 +138,12 @@ mkUntil = mkLivenessOp "Until"
 mkEventually = mkLivenessOp "Eventually"
 mkRelease = mkLivenessOp "Release"
 
--- Example usage:
--- Or (Now (Equals First Second) (Now (Equals First Third)))
+-- usage:
 -- example :: SafetyPred v a
 -- example = do
 --   let p = Now (Equals First Second)
 --       q = Now (Equals First Third)
---      -- w = Now (Third (const False))
 --   safeP <- mkSafePred (Or p q)
---   -- Attempting to add a liveness operator will cause an error:
 --   _ <- mkAlways safeP
 --   return safeP
 
@@ -201,4 +198,4 @@ evalLookUp lu hl = case lu of
   Ninth        -> ninth hl
 
 evaluate :: (Ord a) => Pred v a -> Sig (HList v) -> Bool
-evaluate = evaluate' 25
+evaluate = evaluate' 20

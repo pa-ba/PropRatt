@@ -31,7 +31,6 @@ instance Eq a => Eq (Value a) where
   _ == (Current _ Nil) = False
   (Current b1 (a1 :! xs)) == (Current b2 (a2 :! ys)) = a1 == a2
 
-
 current' :: Value a -> a
 current' (Current _ (h :! _)) = h
 current' _ = undefined

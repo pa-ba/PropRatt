@@ -25,8 +25,7 @@ import AsyncRattus.InternalPrimitives
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Value
 import Data.Kind (Type)
-import Test.QuickCheck (Arbitrary (arbitrary), Gen, resize)
-import qualified Data.IntSet as IntSet
+import Test.QuickCheck (Arbitrary (arbitrary), Gen)
 
 aRatZip :: Sig Int -> Sig Int -> Sig (Int :* Int)
 aRatZip a b = zip a b
@@ -38,7 +37,7 @@ aRatParallel :: Sig a -> Sig b -> Sig (Maybe' a :* Maybe' b)
 aRatParallel a b = parallel a b
 
 jumpFunc :: Int -> Maybe' (Sig Int)
-jumpFunc x = if x > 5 then Nothing' else (Just' (10 ::: never))
+jumpFunc x = if x > 5 then Nothing' else Just' (10 ::: never)
 
 aRatJump :: Box (a -> Maybe' (Sig a)) -> Sig a -> Sig a 
 aRatJump f sig = jump f sig
@@ -73,6 +72,7 @@ instance (Stable a, Stable (HList as)) => Stable (HList (a ': as)) where
 class Stable (HList v) => Flatten s v | s -> v, v -> s where
   flatten :: HList s -> Sig (HList v)
 
+-- todo define this in a way that doesnt need the overlapping pragma
 instance {-# OVERLAPPING #-} (Stable a, Stable (Value a)) => Flatten '[Sig a] '[Value a] where
   flatten (HCons h HNil) = singletonWithHistory h
 
@@ -83,9 +83,11 @@ class Falsify a where
   toFalse :: HList a -> HList a
 
 instance Falsify '[] where
+  toFalse :: HList '[] -> HList '[]
   toFalse _ =  HNil
 
 instance (Falsify as) => Falsify (Value a ': as) where
+  toFalse :: Falsify as => HList (Value a : as) -> HList (Value a : as)
   toFalse (HCons (Current _ y) t) = Current (HasTicked False) y %: toFalse t
 
 first :: HList (a ': _) -> a
@@ -126,7 +128,6 @@ prependAwait x xs y ys  = delay (
      Snd xs' (y' ::: ys')           -> (Current (HasTicked False) x %: y') ::: prependAwait x xs' y' ys'
      Both (x' ::: xs') (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y') ::: prependAwait (x':!x) xs' y' ys')
 
--- Make a singleton HList from an a
 mkSingleton :: a -> HList '[Value a]
 mkSingleton a = Current (HasTicked True) (a :! Nil) %: HNil
 
@@ -157,9 +158,11 @@ class HListGen (ts :: [Type]) where
   generateHList :: Gen (HList (Map Sig ts))
 
 instance HListGen '[] where
+  generateHList :: Gen (HList (Map Sig '[]))
   generateHList = return HNil
 
 instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
+  generateHList :: (Arbitrary (Sig t), HListGen ts) => Gen (HList (Map Sig (t : ts)))
   generateHList = do
     x  <- arbitrary :: Gen (Sig t)
     xs <- generateHList @ts

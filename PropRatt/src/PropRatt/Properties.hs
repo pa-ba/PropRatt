@@ -44,9 +44,8 @@ prop_map_size f sig =
 prop_is_stuttering :: Sig Int -> Sig Int -> Bool
 prop_is_stuttering a b = do
   let zipped = aRatZip a b
-  let stripped = first zipped
+  let stripped = firstValues zipped
   isStuttering a stripped
-
   
 prop_is_stuttering_failing :: Sig Int -> Sig Int -> Bool
 prop_is_stuttering_failing a b = do

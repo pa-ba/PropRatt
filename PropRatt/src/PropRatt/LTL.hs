@@ -8,10 +8,10 @@
 module PropRatt.LTL
   ( Pred (..),
     evaluate,
-    -- example,
-    unWrap,
     Atom (..),
-    LookUp (..)
+    Lookup (..),
+    SafetyError,
+    SafetyPred
   )
 where
 
@@ -21,9 +21,7 @@ import AsyncRattus.Signal hiding (const)
 import qualified Data.IntSet as IntSet
 import PropRatt.AsyncRat
 import Data.Kind
-import Data.Data (Typeable)
 import PropRatt.Value
-
 
 data Pred (v :: [Type]) a where
   Tautology     :: Pred v a
@@ -41,48 +39,22 @@ data Pred (v :: [Type]) a where
   Release       :: Pred v a -> Pred v a -> Pred v a 
   
 data Atom (v :: [Type]) a where
-  Equals :: LookUp v a -> LookUp v a -> Atom v a 
-  LargerThan :: LookUp v a -> LookUp v a -> Atom v a
-  GreaterThan :: LookUp v a -> LookUp v a -> Atom v a
+  Equals :: Lookup v a -> Lookup v a -> Atom v a 
+  LargerThan :: Lookup v a -> Lookup v a -> Atom v a
+  GreaterThan :: Lookup v a -> Lookup v a -> Atom v a
 
-
-data LookUp (v :: [Type]) a where 
-  Prior :: LookUp v a -> LookUp v a
-  First :: LookUp (Value a ': x) a
-  Second :: LookUp (x1 ': Value a ': x2) a
-  Third :: LookUp (x1 ': x2': Value a ': x3) a
-  Fourth :: LookUp (x1 ': x2 ': x3 ': Value a ': x4) a
-  Fifth :: LookUp (x1 ': x2 ': x3 ': x4 ': Value a ': x5) a
-  Sixth :: LookUp (x1 ': x2 ': x3 ': x4 ': x5 ': Value a ': x6) a
-  Seventh :: LookUp (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': Value a ': x7) a
-  Eigth :: LookUp (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value a ': x8) a
-  Ninth :: LookUp (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value a ': x9) a
-
--- -- Maybe not eval? YES
--- eval :: Atom v -> Pred v
--- eval atom = case atom of
---   --Equal -> 
---   Prior selector hlist -> case selector hlist of 
---     (Current _ (_ :! a :! _)) -> a
---   First hls -> first hls
---   Second hls -> second hls
---   Third hls -> third hls
---   Fourth hls -> fourth hls
---   Fifth hls -> fifth hls
---   Sixth hls -> sixth hls
---   Seventh hls -> seventh hls
---   Eight hls -> eight hls
---   Ninth hls -> ninth hls
-
-
--- packman b = if b then Tautology else Contradiction
-
--- compare :: (a -> b -> Bool) -> Value a -> Value b -> Pred v
--- comp f a1 a2 = 
-
--- (??=) :: Value a -> Value b -> Bool v
--- (??=) (Current _ (a :! as)) (Current _ (b :! bs)) = a == b
-
+data Lookup (v :: [Type]) a where 
+  Const    :: a -> Lookup v a
+  Previous :: Lookup v a -> Lookup v a
+  First :: Lookup (Value a ': x) a
+  Second :: Lookup (x1 ': Value a ': x2) a
+  Third :: Lookup (x1 ': x2': Value a ': x3) a
+  Fourth :: Lookup (x1 ': x2 ': x3 ': Value a ': x4) a
+  Fifth :: Lookup (x1 ': x2 ': x3 ': x4 ': Value a ': x5) a
+  Sixth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': Value a ': x6) a
+  Seventh :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': Value a ': x7) a
+  Eigth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value a ': x8) a
+  Ninth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value a ': x9) a
 
 isSafetyPredicate :: Pred v a -> Bool
 isSafetyPredicate Tautology       = True
@@ -94,7 +66,6 @@ isSafetyPredicate (Or q p)        = isSafetyPredicate q || isSafetyPredicate p
 isSafetyPredicate (Next p)        = isSafetyPredicate p
 isSafetyPredicate (Implies q p)   = isSafetyPredicate q && isSafetyPredicate p
 isSafetyPredicate (After _ p)     = isSafetyPredicate p
--- Unsafe
 isSafetyPredicate (Until _ _)     = False
 isSafetyPredicate (Always _ )     = False
 isSafetyPredicate (Eventually _ ) = False
@@ -102,12 +73,12 @@ isSafetyPredicate (Release _ _)   = False
 
 type SafetyPred v a = Either SafetyError (Pred v a)
 
-data SafetyError = LivenessOperatorError String | GenericError String
+newtype SafetyError = SafetyError String
 
 mkSafePred :: Pred v a -> SafetyPred v a
 mkSafePred p
   | isSafetyPredicate p = Right p
-  | otherwise = Left $ GenericError "Predicate is a safety property."
+  | otherwise = Left $ SafetyError "Predicate is a safety property."
 
 mkBinaryOp :: (Pred v a -> Pred v a -> Pred v a) -> Pred v a -> Pred v a -> SafetyPred v a
 mkBinaryOp op p q = do
@@ -130,7 +101,7 @@ mkTautology = mkUnaryOp id
 mkContradiction = mkUnaryOp id
 
 mkLivenessOp :: String -> Pred v a -> SafetyPred v a
-mkLivenessOp op _ = Left $ LivenessOperatorError ("The '" ++ op ++ "' operator cannot be constructed in a safety property.")
+mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in a safety property.")
 
 mkAlways, mkUntil, mkEventually, mkRelease :: Pred v a -> SafetyPred v a
 mkAlways = mkLivenessOp "Always"
@@ -138,38 +109,33 @@ mkUntil = mkLivenessOp "Until"
 mkEventually = mkLivenessOp "Eventually"
 mkRelease = mkLivenessOp "Release"
 
--- usage:
--- example :: SafetyPred v a
--- example = do
---   let p = Now (Equals First Second)
---       q = Now (Equals First Third)
---   safeP <- mkSafePred (Or p q)
---   _ <- mkAlways safeP
---   return safeP
-
-unWrap :: SafetyPred v a -> String
-unWrap s = case s of 
-  Left s -> "err"
-  Right s -> "no err"
+example :: SafetyPred '[Value a, Value a, Value a] a
+example = do
+  let p = Now (Equals First Second)
+      q = Now (Equals First Third)
+  safeP <- mkSafePred (Or p q)
+  _ <- mkAlways safeP
+  return safeP
 
 evaluate' :: (Ord a) => Int -> Pred v a -> Sig (HList v) -> Bool
 evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
-  timestepsLeft <= 0
-    || case formulae of
-         Now atom        -> evalAtom atom x
-         Not phi         -> not (eval phi sig)
-         And phi psi     -> eval phi sig && eval psi sig
-         Or phi psi      -> eval phi sig || eval psi sig
-         Until phi psi   -> eval psi sig
-                            || (eval phi sig && evaluateNext (phi `Until` psi) advance)
-         Next phi        -> evaluateNext phi advance
-         Implies phi psi -> not (eval phi sig && not (eval psi sig))
-         Always phi      -> eval phi sig && evaluateNext (Always phi) advance
-         Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
+  timestepsLeft <= 0 || case formulae of
+        Tautology       -> True
+        Contradiction   -> False
+        Now atom        -> evalAtom atom x
+        Not phi         -> not (eval phi sig)
+        And phi psi     -> eval phi sig && eval psi sig
+        Or phi psi      -> eval phi sig || eval psi sig
+        Until phi psi   -> eval psi sig
+                           || (eval phi sig && evaluateNext (phi `Until` psi) advance)
+        Next phi        -> evaluateNext phi advance
+        Implies phi psi -> not (eval phi sig && not (eval psi sig))
+        Always phi      -> eval phi sig && evaluateNext (Always phi) advance
+        Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
                             && not (timestepsLeft == 1 && not (eval phi sig))
-         Release phi psi -> (eval psi sig && eval phi sig)
+        Release phi psi -> (eval psi sig && eval phi sig)
                             || (eval psi sig && evaluateNext (phi `Until` psi) advance)
-         After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
+        After n phi      -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
   where
     evaluateNext = evaluate' (timestepsLeft - 1)
     eval = evaluate' timestepsLeft
@@ -178,15 +144,17 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
 
 evalAtom :: (Ord a) => Atom v a -> HList v -> Bool
 evalAtom a hl = case a of
-  Equals x y       -> evalLookUp x hl == evalLookUp y hl
-  LargerThan x y   -> evalLookUp x hl > evalLookUp y hl
-  GreaterThan x y  -> evalLookUp x hl < evalLookUp y hl
+  Equals x y       -> evalLookup x hl == evalLookup y hl
+  LargerThan x y   -> evalLookup x hl > evalLookup y hl
+  GreaterThan x y  -> evalLookup x hl < evalLookup y hl
 
-evalLookUp :: (Ord a) => LookUp v a -> HList v -> Value a
-evalLookUp lu hl = case lu of
-  Prior f       -> 
-    let (Current b (_ :! v)) = evalLookUp f hl
-    in Current b v
+evalLookup :: (Ord a) => Lookup v a -> HList v -> Value a
+evalLookup lu hl = case lu of
+  Previous f       -> 
+    let (Current b rest) = evalLookup f hl -- dangerous, out of bounds
+    in case rest of
+         _ :! v -> Current b v
+         Nil    -> error "Previous: out of bounds"
   First         -> first hl
   Second        -> second hl
   Third         -> third hl
@@ -196,6 +164,7 @@ evalLookUp lu hl = case lu of
   Seventh      -> seventh hl
   Eigth        -> eigth hl
   Ninth        -> ninth hl
+  Const a      -> Current (HasTicked True) (a :! Nil)
 
 evaluate :: (Ord a) => Pred v a -> Sig (HList v) -> Bool
 evaluate = evaluate' 20

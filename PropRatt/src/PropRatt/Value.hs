@@ -23,7 +23,7 @@ instance Show a => Show (Sig [Value a]) where
   show sig = "Sig [Value a]: " ++ show (takeSigExhaustive sig) ++ "..."
 
 instance Ord a => Ord (Value a) where 
-  (Current b1 (a1 :! xs)) `compare` (Current b2 (a2 :! ys)) = a1 `compare` a2
+    (Current b1 (a1 :! xs)) `compare` (Current b2 (a2 :! ys)) = a1 `compare` a2
 
 instance Eq a => Eq (Value a) where
   (Current _ Nil) == (Current _ Nil) = True

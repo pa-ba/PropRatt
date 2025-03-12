@@ -41,7 +41,7 @@ prop_switchedSignal = forAll (generateSignals @[Int, Int]) $ \intSignals ->
 
 -- A buffered signal is always one tick behind
 prop_buffer :: Property
-prop_buffer = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+prop_buffer = forAll (generateSignals @Int) $ \intSignals ->
     let bufferedSig = aRatBuffer 10 (first intSignals)
         signalsUnderTest = prepend bufferedSig $ flatten intSignals
     in evaluate (Next (Always (Now (Equals First (Previous Second))))) signalsUnderTest

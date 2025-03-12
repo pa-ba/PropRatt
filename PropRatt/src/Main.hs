@@ -18,7 +18,7 @@ instance Stable (Value a) where
 
 main :: IO ()
 main = do
-    intSignals <- generate $ generateSignals @[Int, Int]
+    intSignals <- generate $ generateSignals @Int
     let bufferedSig = aRatBuffer 10 (first intSignals)
         signalsUnderTest = prepend bufferedSig $ flatten intSignals
     

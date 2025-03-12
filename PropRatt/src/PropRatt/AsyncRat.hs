@@ -11,6 +11,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -37,7 +38,7 @@ aRatParallel :: Sig a -> Sig b -> Sig (Maybe' a :* Maybe' b)
 aRatParallel a b = parallel a b
 
 jumpFunc :: Int -> Maybe' (Sig Int)
-jumpFunc x = if x > 5 then Nothing' else (Just' (10 ::: never))
+jumpFunc x = if x > 5 then Nothing' else Just' (10 ::: never)
 
 aRatJump :: Box (a -> Maybe' (Sig a)) -> Sig a -> Sig a 
 aRatJump f sig = jump f sig
@@ -73,17 +74,10 @@ type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
   Map f '[] = '[]
   Map f (x ': xs) = f x ': Map f xs
 
-type family ToSig (f :: Type -> Type) (xs :: Type) :: [Type] where
-  ToSig f t = '[f t]
-
-class HListGen2 (ts :: Type) where
-  generateHList2 :: Gen (HList (ToSig Sig ts))
-
-instance (Arbitrary (Sig ts), HListGen2 ts) => HListGen2 ts where
-  generateHList2 = do
-    x <- arbitrary
-    return (x %: HNil)
-
+-- Use polykinds to allow us to overload generateSignals to work for both Type and Type -> Type
+type family ToList (a :: k) :: [Type] where
+  ToList (a :: [Type]) = a
+  ToList (a :: Type)   = '[a]
 
 class HListGen (ts :: [Type]) where
   generateHList :: Gen (HList (Map Sig ts))
@@ -100,6 +94,7 @@ instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
 class Stable (HList v) => Flatten s v | s -> v, v -> s where
   flatten :: HList s -> Sig (HList v)
 
+-- todo define this in a way that doesnt need the overlapping pragma
 instance {-# OVERLAPPING #-} (Stable a, Stable (Value a)) => Flatten '[Sig a] '[Value a] where
   flatten (HCons h HNil) = singleton' h
 
@@ -110,9 +105,11 @@ class Falsify a where
   toFalse :: HList a -> HList a
 
 instance Falsify '[] where
+  toFalse :: HList '[] -> HList '[]
   toFalse _ =  HNil
 
 instance (Falsify as) => Falsify (Value a ': as) where
+  toFalse :: Falsify as => HList (Value a : as) -> HList (Value a : as)
   toFalse (HCons (Current _ y) t) = Current (HasTicked False) y %: toFalse t
 
 first :: HList (a ': _) -> a
@@ -164,8 +161,5 @@ singleton'' (h ::: t@(Delay cl f)) acc = if IntSet.null cl
 motherNever :: O (Sig (HList (Map Value '[a])))
 motherNever = Delay IntSet.empty (error "Trying to adv on the 'never' delayed computation")
 
-generateSigs :: forall (ts :: [Type]). HListGen ts => Gen (HList (Map Sig ts))
-generateSigs = generateHList @ts
-
-generateSig :: forall (ts :: Type). HListGen2 ts => Gen (HList (ToSig Sig ts))
-generateSig = generateHList2 @ts
+generateSignals :: forall a. HListGen (ToList a) => Gen (HList (Map Sig (ToList a)))
+generateSignals = generateHList @(ToList a)

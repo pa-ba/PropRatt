@@ -11,7 +11,9 @@ module PropRatt.LTL
     Atom (..),
     Lookup (..),
     SafetyError,
-    SafetyPred
+    SafetyPred,
+    (====),
+    (++++)
   )
 where
 
@@ -65,7 +67,7 @@ instance Applicative (Atom ts) where
     Apply f g <*> x = Apply (Apply f g) x
 
 x ++++ y = (+) <$> x <*> y
-x === y = (==) <$> x <*> y
+x ==== y = (==) <$> x <*> y
 
 evalAtom :: Atom ts t -> HList ts -> Maybe' (Value t)
 evalAtom atom hls = case atom of

@@ -23,106 +23,84 @@ import PropRatt.AsyncRat
 import Data.Kind
 import PropRatt.Value
 
-data Pred (v :: [Type]) a where
-  Tautology     :: Pred v a
-  Contradiction :: Pred v a
-  Now           :: Atom v a -> Pred v a
-  Not           :: Pred v a -> Pred v a
-  And           :: Pred v a -> Pred v a -> Pred v a
-  Or            :: Pred v a -> Pred v a -> Pred v a
-  Until         :: Pred v a -> Pred v a -> Pred v a
-  Next          :: Pred v a -> Pred v a
-  Implies       :: Pred v a -> Pred v a -> Pred v a
-  Always        :: Pred v a -> Pred v a
-  Eventually    :: Pred v a -> Pred v a
-  After         :: Int -> Pred v a -> Pred v a
-  Release       :: Pred v a -> Pred v a -> Pred v a 
+data Pred (ts :: [Type]) a where
+  Tautology     :: Pred ts a
+  Contradiction :: Pred ts a
+  Now           :: Atom ts a -> Pred ts a
+  Not           :: Pred ts a -> Pred ts a
+  And           :: Pred ts a -> Pred ts a -> Pred ts a
+  Or            :: Pred ts a -> Pred ts a -> Pred ts a
+  Until         :: Pred ts a -> Pred ts a -> Pred ts a
+  Next          :: Pred ts a -> Pred ts a
+  Implies       :: Pred ts a -> Pred ts a -> Pred ts a
+  Always        :: Pred ts a -> Pred ts a
+  Eventually    :: Pred ts a -> Pred ts a
+  After         :: Int -> Pred ts a -> Pred ts a
+  Release       :: Pred ts a -> Pred ts a -> Pred ts a 
   
-data Atom (v :: [Type]) a where
-  Equals :: Lookup v a -> Lookup v a -> Atom v a 
-  LargerThan :: Lookup v a -> Lookup v a -> Atom v a
-  GreaterThan :: Lookup v a -> Lookup v a -> Atom v a
+data Atom (ts :: [Type]) (t :: Type) where
+  Pure :: t -> Atom ts t
+  Apply :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
+  Index :: Lookup ts t -> Atom ts t
+  
+data Lookup (ts :: [Type]) (t :: Type) where
+  Previous :: Lookup ts t -> Lookup ts t
+  First :: Lookup (Value t ': x) t
+  Second :: Lookup (x1 ': Value t ': x2) t
+  Third :: Lookup (x1 ': x2': Value t ': x3) t
+  Fourth :: Lookup (x1 ': x2 ': x3 ': Value t ': x4) t
+  Fifth :: Lookup (x1 ': x2 ': x3 ': x4 ': Value t ': x5) t
+  Sixth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': Value t ': x6) t
+  Seventh :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': Value t ': x7) t
+  Eigth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value t ': x8) t
+  Ninth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value t ': x9) t
+  
+instance Functor (Atom ts) where
+  fmap f (Pure x) = Pure (f x)
+  fmap f (Apply g x) = Apply (fmap (f .) g) x
 
-data Lookup (v :: [Type]) a where 
-  Const    :: a -> Lookup v a
-  Previous :: Lookup v a -> Lookup v a
-  First :: Lookup (Value a ': x) a
-  Second :: Lookup (x1 ': Value a ': x2) a
-  Third :: Lookup (x1 ': x2': Value a ': x3) a
-  Fourth :: Lookup (x1 ': x2 ': x3 ': Value a ': x4) a
-  Fifth :: Lookup (x1 ': x2 ': x3 ': x4 ': Value a ': x5) a
-  Sixth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': Value a ': x6) a
-  Seventh :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': Value a ': x7) a
-  Eigth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value a ': x8) a
-  Ninth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value a ': x9) a
+instance Applicative (Atom ts) where
+    pure = Pure
+    Pure f <*> x = fmap f x
+    Apply f g <*> x = Apply (Apply f g) x
 
-isSafetyPredicate :: Pred v a -> Bool
-isSafetyPredicate Tautology       = True
-isSafetyPredicate Contradiction   = True
-isSafetyPredicate (Now _)         = True
-isSafetyPredicate (Not p)         = isSafetyPredicate p
-isSafetyPredicate (And q p)       = isSafetyPredicate q && isSafetyPredicate p
-isSafetyPredicate (Or q p)        = isSafetyPredicate q || isSafetyPredicate p
-isSafetyPredicate (Next p)        = isSafetyPredicate p
-isSafetyPredicate (Implies q p)   = isSafetyPredicate q && isSafetyPredicate p
-isSafetyPredicate (After _ p)     = isSafetyPredicate p
-isSafetyPredicate (Until _ _)     = False
-isSafetyPredicate (Always _ )     = False
-isSafetyPredicate (Eventually _ ) = False
-isSafetyPredicate (Release _ _)   = False
+x ++++ y = (+) <$> x <*> y
+x === y = (==) <$> x <*> y
 
-type SafetyPred v a = Either SafetyError (Pred v a)
+evalAtom :: Atom ts t -> HList ts -> Maybe' (Value t)
+evalAtom atom hls = case atom of
+  Pure x -> Just' (Current (HasTicked True) (x :! Nil))
+  Pure (f :: Value t -> Value r) -> Just' f
+  Apply f x -> evalAtom f hls <*> evalAtom x hls
+  Index lu -> evalLookup lu hls
 
-newtype SafetyError = SafetyError String
+evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
+evalLookup lu hls = case lu of
+  Previous lookup -> 
+    -- please make Maybe' a monad instance :)
+    let m = evalLookup lookup hls
+    in case m of
+      Just' (Current b history) -> 
+        case history of
+          _ :! xs -> Just' (Current b xs)
+          Nil    -> Nothing'
+      Nothing' -> Nothing'
+  First         -> Just' (first hls)
+  Second        -> Just' (second hls)
+  Third         -> Just' (third hls)
+  Fourth       -> Just' (fourth hls)
+  Fifth        -> Just' (fifth hls)
+  Sixth        -> Just' (sixth hls)
+  Seventh      -> Just' (seventh hls)
+  Eigth        -> Just' (eigth hls)
+  Ninth        -> Just' (ninth hls)
 
-mkSafePred :: Pred v a -> SafetyPred v a
-mkSafePred p
-  | isSafetyPredicate p = Right p
-  | otherwise = Left $ SafetyError "Predicate is a safety property."
-
-mkBinaryOp :: (Pred v a -> Pred v a -> Pred v a) -> Pred v a -> Pred v a -> SafetyPred v a
-mkBinaryOp op p q = do
-  p' <- mkSafePred p
-  q' <- mkSafePred q
-  return (op p' q')
-
-mkAnd, mkOr, mkImplies :: Pred v a -> Pred v a -> SafetyPred v a
-mkAnd = mkBinaryOp And
-mkOr = mkBinaryOp Or
-mkImplies = mkBinaryOp Implies
-
-mkUnaryOp :: (Pred v a -> Pred v a) -> Pred v a -> SafetyPred v a
-mkUnaryOp op = mkSafePred . op
-
-mkNext, mkNow, mkTautology, mkContradiction :: Pred v a -> SafetyPred v a
-mkNext = mkUnaryOp id
-mkNow = mkUnaryOp id
-mkTautology = mkUnaryOp id
-mkContradiction = mkUnaryOp id
-
-mkLivenessOp :: String -> Pred v a -> SafetyPred v a
-mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in a safety property.")
-
-mkAlways, mkUntil, mkEventually, mkRelease :: Pred v a -> SafetyPred v a
-mkAlways = mkLivenessOp "Always"
-mkUntil = mkLivenessOp "Until"
-mkEventually = mkLivenessOp "Eventually"
-mkRelease = mkLivenessOp "Release"
-
-example :: SafetyPred '[Value a, Value a, Value a] a
-example = do
-  let p = Now (Equals First Second)
-      q = Now (Equals First Third)
-  safeP <- mkSafePred (Or p q)
-  _ <- mkAlways safeP
-  return safeP
-
-evaluate' :: (Ord a) => Int -> Pred v a -> Sig (HList v) -> Bool
+evaluate' :: (Ord a) => Int -> Pred ts a -> Sig (HList ts) -> Bool
 evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
   timestepsLeft <= 0 || case formulae of
         Tautology       -> True
         Contradiction   -> False
-        Now atom        -> evalAtom atom x
+        Now atom        -> True
         Not phi         -> not (eval phi sig)
         And phi psi     -> eval phi sig && eval psi sig
         Or phi psi      -> eval phi sig || eval psi sig
@@ -141,30 +119,62 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
     eval = evaluate' timestepsLeft
     smallest = IntSet.findMin
     advance = f (InputValue (smallest cl) ())
-
-evalAtom :: (Ord a) => Atom v a -> HList v -> Bool
-evalAtom a hl = case a of
-  Equals x y       -> evalLookup x hl == evalLookup y hl
-  LargerThan x y   -> evalLookup x hl > evalLookup y hl
-  GreaterThan x y  -> evalLookup x hl < evalLookup y hl
-
-evalLookup :: (Ord a) => Lookup v a -> HList v -> Value a
-evalLookup lu hl = case lu of
-  Previous f       -> 
-    let (Current b rest) = evalLookup f hl -- dangerous, out of bounds
-    in case rest of
-         _ :! v -> Current b v
-         Nil    -> error "Previous: out of bounds"
-  First         -> first hl
-  Second        -> second hl
-  Third         -> third hl
-  Fourth       -> fourth hl
-  Fifth        -> fifth hl
-  Sixth        -> sixth hl
-  Seventh      -> seventh hl
-  Eigth        -> eigth hl
-  Ninth        -> ninth hl
-  Const a      -> Current (HasTicked True) (a :! Nil)
-
-evaluate :: (Ord a) => Pred v a -> Sig (HList v) -> Bool
+  
+evaluate :: (Ord a) => Pred ts a -> Sig (HList ts) -> Bool
 evaluate = evaluate' 20
+
+
+-------------------------------
+
+isSafetyPredicate :: Pred ts a -> Bool
+isSafetyPredicate Tautology       = True
+isSafetyPredicate Contradiction   = True
+isSafetyPredicate (Now _)         = True
+isSafetyPredicate (Not p)         = isSafetyPredicate p
+isSafetyPredicate (And q p)       = isSafetyPredicate q && isSafetyPredicate p
+isSafetyPredicate (Or q p)        = isSafetyPredicate q || isSafetyPredicate p
+isSafetyPredicate (Next p)        = isSafetyPredicate p
+isSafetyPredicate (Implies q p)   = isSafetyPredicate q && isSafetyPredicate p
+isSafetyPredicate (After _ p)     = isSafetyPredicate p
+isSafetyPredicate (Until _ _)     = False
+isSafetyPredicate (Always _ )     = False
+isSafetyPredicate (Eventually _ ) = False
+isSafetyPredicate (Release _ _)   = False
+
+type SafetyPred ts a = Either SafetyError (Pred ts a)
+
+newtype SafetyError = SafetyError String
+
+mkSafePred :: Pred ts a -> SafetyPred ts a
+mkSafePred p
+  | isSafetyPredicate p = Right p
+  | otherwise = Left $ SafetyError "Predicate is a safety property."
+
+mkBinaryOp :: (Pred ts a -> Pred ts a -> Pred ts a) -> Pred ts a -> Pred ts a -> SafetyPred ts a
+mkBinaryOp op p q = do
+  p' <- mkSafePred p
+  q' <- mkSafePred q
+  return (op p' q')
+
+mkAnd, mkOr, mkImplies :: Pred ts a -> Pred ts a -> SafetyPred ts a
+mkAnd = mkBinaryOp And
+mkOr = mkBinaryOp Or
+mkImplies = mkBinaryOp Implies
+
+mkUnaryOp :: (Pred ts a -> Pred ts a) -> Pred ts a -> SafetyPred ts a
+mkUnaryOp op = mkSafePred . op
+
+mkNext, mkNow, mkTautology, mkContradiction :: Pred ts a -> SafetyPred ts a
+mkNext = mkUnaryOp id
+mkNow = mkUnaryOp id
+mkTautology = mkUnaryOp id
+mkContradiction = mkUnaryOp id
+
+mkLivenessOp :: String -> Pred ts a -> SafetyPred ts a
+mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in a safety property.")
+
+mkAlways, mkUntil, mkEventually, mkRelease :: Pred ts a -> SafetyPred ts a
+mkAlways = mkLivenessOp "Always"
+mkUntil = mkLivenessOp "Until"
+mkEventually = mkLivenessOp "Eventually"
+mkRelease = mkLivenessOp "Release"

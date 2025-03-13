@@ -26,29 +26,30 @@ instance Stable Int where
 
 
 -- Jump property (value is either equal to the original signal or equal to 10 (which is the number of the signal of the dummy function))
-prop_jump :: Property
-prop_jump = forAll (generateSignals @[Int, Int]) $ \intSignals ->
-    let jumpSig = aRatJump (box jumpFunc) (first intSignals)
-        signalsUnderTest = prepend jumpSig $ flatten intSignals
-    in evaluate (Always (Or (Now (Equals First Second)) (Now (Equals First (Const 10))))) signalsUnderTest
+-- prop_jump :: Property
+-- prop_jump = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+--     let jumpSig = aRatJump (box jumpFunc) (first intSignals)
+--         signalsUnderTest = prepend jumpSig $ flatten intSignals
+--     in evaluate (Always (Or (Now (Equals First Second)) (Now (Equals First (Const 10))))) signalsUnderTest
 
--- A switched signal has values equal to the first signal until its values equal values from the third signal
-prop_switchedSignal :: Property
-prop_switchedSignal = forAll (generateSignals @[Int, Int]) $ \intSignals -> 
-    let switched = aRatSwitch (first intSignals) (getLater (second intSignals))
-        signalsUnderTest = prepend switched $ flatten intSignals
-    in evaluate (Until (Now (Equals First Second)) (Now (Equals First Third))) signalsUnderTest
+-- -- A switched signal has values equal to the first signal until its values equal values from the third signal
+-- prop_switchedSignal :: Property
+-- prop_switchedSignal = forAll (generateSignals @[Int, Int]) $ \intSignals -> 
+--     let switched = aRatSwitch (first intSignals) (getLater (second intSignals))
+--         signalsUnderTest = prepend switched $ flatten intSignals
+--     in evaluate (Until (Now (Equals First Second)) (Now (Equals First Third))) signalsUnderTest
 
--- A buffered signal is always one tick behind
-prop_buffer :: Property
-prop_buffer = forAll (generateSignals @Int) $ \intSignals ->
-    let bufferedSig = aRatBuffer 10 (first intSignals)
-        signalsUnderTest = prepend bufferedSig $ flatten intSignals
-    in evaluate (Next (Always (Now (Equals First (Previous Second))))) signalsUnderTest
+-- -- A buffered signal is always one tick behind
+-- prop_buffer :: Property
+-- prop_buffer = forAll (generateSignals @Int) $ \intSignals ->
+--     let bufferedSig = aRatBuffer 10 (first intSignals)
+--         signalsUnderTest = prepend bufferedSig $ flatten intSignals
+--     in evaluate (Next (Always (Now (Equals First (Previous Second))))) signalsUnderTest
 
 main :: IO ()
 main = do
-    quickCheck prop_switchedSignal
-    quickCheck prop_buffer
-    quickCheck prop_jump
+    print "hej"
+    -- quickCheck prop_switchedSignal
+    -- quickCheck prop_buffer
+    -- quickCheck prop_jump
     

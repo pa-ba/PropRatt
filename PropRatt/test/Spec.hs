@@ -12,9 +12,7 @@ import PropRatt.AsyncRat
 import AsyncRattus.InternalPrimitives
 import PropRatt.Utilities hiding ()
 import AsyncRattus.Signal
-
-instance Stable (Value a) where 
-instance Stable Int where 
+import AsyncRattus.Strict
 
 prop_interleave :: Property
 prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
@@ -23,6 +21,7 @@ prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
         signalsUnderTest = prepend notALaterSig $ flatten intSignals
     in evaluate (Next (Always (Or (Or (Now ((Index First) |==| (Index Second))) (Now ((Index First) |==| (Index Third)))) (Now (((+) <$> (Index Second) <*> (Index Third)) |==| (Index First)))))) signalsUnderTest
 
+-- Not in scope rn
 -- Jump property (value is either equal to the original signal or equal to 10 (which is the number of the signal of the dummy function))
 -- prop_jump :: Property
 -- prop_jump = forAll (generateSignals @[Int, Int]) $ \intSignals ->
@@ -44,6 +43,16 @@ prop_buffer = forAll (generateSignals @Int) $ \intSignals ->
         signalsUnderTest = prepend bufferedSig $ flatten intSignals
     in evaluate (Next (Always (Now ((Index First) |==| (Index (Previous Second)))))) signalsUnderTest
 
+
+-- A zipped signal (first signal) always has fst' values from second signal and snd' values from third signal
+prop_zip :: Property
+prop_zip = forAll (generateSignals @[Int, Int]) $ \intSignals -> 
+    let s1 = aRatZip (first intSignals) (second intSignals)
+        signalsUnderTest = prepend s1 $ flatten intSignals
+    in (evaluate (Always (And (Now ((fst' <$> (Index First)) |==| (Index Second))) (Now ((snd' <$> (Index First)) |==| (Index Third))))) signalsUnderTest)
+
+
+-- dummy failing property for sanity check :D 
 prop_shouldFail :: Property
 prop_shouldFail = forAll (generateSignals @Int) $ \intSignals ->
     let bufferedSig = aRatBuffer 10 (first intSignals)
@@ -54,5 +63,6 @@ main :: IO ()
 main = do
     quickCheck prop_interleave
     quickCheck prop_switchedSignal
-    quickCheck prop_buffer   
+    quickCheck prop_buffer  
+    quickCheck prop_zip 
     quickCheck prop_shouldFail 

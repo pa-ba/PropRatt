@@ -10,7 +10,12 @@ module PropRatt.Value where
 import AsyncRattus.Strict
 import AsyncRattus.Signal hiding (current)
 import PropRatt.Utilities
-  
+import AsyncRattus
+
+instance Stable (Value a) where 
+instance Stable Int where 
+
+
 newtype HasTicked = HasTicked Bool deriving Show
 
 data Value a where

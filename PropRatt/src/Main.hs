@@ -15,8 +15,6 @@ import Test.QuickCheck (generate)
 import AsyncRattus.InternalPrimitives
 import AsyncRattus.Signal
 
-instance Stable (Value a) where 
-
 main :: IO ()
 main = do
     print "hej"

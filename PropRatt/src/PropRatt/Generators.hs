@@ -20,6 +20,11 @@ instance (Arbitrary a) => Arbitrary (Sig a) where
     len <- choose (30, 50)
     arbitrarySig len
 
+newtype Natural = Natural Int
+
+instance Arbitrary Natural where
+  arbitrary = Natural <$> chooseInt (0, maxBound)
+
 instance (Show a) => Show (Sig a) where
   show (x ::: xs) = show (takeSigExhaustive (x ::: xs))
 

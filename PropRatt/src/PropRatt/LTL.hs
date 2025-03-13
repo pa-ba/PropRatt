@@ -86,15 +86,16 @@ x |==| y = (==) <$> x <*> y
 
 evalAtom :: Atom ts t -> HList ts -> Atom ts t
 evalAtom atom hls = case atom of
-  Pure x -> Pure x  -- Return the Pure value as is
+  Pure x -> Pure x 
   Apply f x ->
       case (evalAtom f hls, evalAtom x hls) of
-        (Pure f' , Pure x') -> Pure (f' x')  -- Apply function f to x, both evaluated as Pure values
-        _ -> error "undefined"
+        (Pure f' , Pure x') -> Pure (f' x')
+        _ -> error "Atomic statement cannot be partially applied"
   Index lu -> 
     let m = evalLookup lu hls
     in case m of 
       Just' (Current b (h :! t)) -> Pure h
+      Just' (Current b Nil) -> error "hej :)"
       Nothing' -> error "hej :)"
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)

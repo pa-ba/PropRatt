@@ -7,7 +7,6 @@ module PropRatt.Utilities (
     takeSigAndClockExhaustive,
     sizeSig,
     pickSmallestClock,
-    firstValues,
     isStuttering,
     stuttering,
     isEventuallyEqual,
@@ -20,9 +19,6 @@ import AsyncRattus.Signal (Sig(..), map)
 import AsyncRattus.InternalPrimitives( O(..), Box(Box), InputValue(InputValue) )
 import qualified Data.IntSet as IntSet
 import Prelude hiding (map, zip, zipWith)
-
-firstValues :: Sig (Int :* Int) -> Sig Int
-firstValues = map (Box fst')
 
 pickSmallestClock :: IntSet.IntSet -> Int
 pickSmallestClock = IntSet.findMin

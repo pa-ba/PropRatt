@@ -10,13 +10,14 @@ import PropRatt.Generators
 import PropRatt.Value
 import PropRatt.AsyncRat
 import AsyncRattus.InternalPrimitives
-import PropRatt.Utilities hiding ()
+import PropRatt.Utilities
+import Prelude hiding (zip)
 import AsyncRattus.Signal
 import AsyncRattus.Strict
 
 prop_interleave :: Property
 prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
-    let interleavedSig = aRatInterleave (box (+)) (getLater $ first intSignals) (getLater $ second intSignals)
+    let interleavedSig = interleave (box (+)) (getLater $ first intSignals) (getLater $ second intSignals)
         notALaterSig = 0 ::: interleavedSig
         signalsUnderTest = prepend notALaterSig $ flatten intSignals
     in evaluate (Next (Always (Or (Or (Now ((Index First) |==| (Index Second))) (Now ((Index First) |==| (Index Third)))) (Now (((+) <$> (Index Second) <*> (Index Third)) |==| (Index First)))))) signalsUnderTest
@@ -32,30 +33,28 @@ prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
 -- A switched signal has values equal to the first signal until its values equal values from the third signal
 prop_switchedSignal :: Property
 prop_switchedSignal = forAll (generateSignals @[Int, Int]) $ \intSignals -> 
-    let switched = aRatSwitch (first intSignals) (getLater (second intSignals))
+    let switched = switch (first intSignals) (getLater (second intSignals))
         signalsUnderTest = prepend switched $ flatten intSignals
     in evaluate (Until (Now ((Index First) |==| (Index Second))) (Now ((Index First) |==| (Index Third)))) signalsUnderTest
 
 -- A buffered signal is always one tick behind
 prop_buffer :: Property
 prop_buffer = forAll (generateSignals @Int) $ \intSignals ->
-    let bufferedSig = aRatBuffer 10 (first intSignals)
+    let bufferedSig = buffer 10 (first intSignals)
         signalsUnderTest = prepend bufferedSig $ flatten intSignals
     in evaluate (Next (Always (Now ((Index First) |==| (Index (Previous Second)))))) signalsUnderTest
-
 
 -- A zipped signal (first signal) always has fst' values from second signal and snd' values from third signal
 prop_zip :: Property
 prop_zip = forAll (generateSignals @[Int, Int]) $ \intSignals -> 
-    let s1 = aRatZip (first intSignals) (second intSignals)
+    let s1 = zip (first intSignals) (second intSignals)
         signalsUnderTest = prepend s1 $ flatten intSignals
     in (evaluate (Always (And (Now ((fst' <$> (Index First)) |==| (Index Second))) (Now ((snd' <$> (Index First)) |==| (Index Third))))) signalsUnderTest)
-
 
 -- dummy failing property for sanity check :D 
 prop_shouldFail :: Property
 prop_shouldFail = forAll (generateSignals @Int) $ \intSignals ->
-    let bufferedSig = aRatBuffer 10 (first intSignals)
+    let bufferedSig = buffer 10 (first intSignals)
         signalsUnderTest = prepend bufferedSig $ flatten intSignals
     in evaluate (Next (Always (Now ((Pure 10) |==| (Index (Previous (Second))))))) signalsUnderTest
 
@@ -65,4 +64,4 @@ main = do
     quickCheck prop_switchedSignal
     quickCheck prop_buffer  
     quickCheck prop_zip 
-    quickCheck prop_shouldFail 
+    quickCheck prop_shouldFail

@@ -30,7 +30,6 @@ library
       PropRatt.Generators
       PropRatt.LTL
       PropRatt.Playground
-      PropRatt.Properties
       PropRatt.Utilities
       PropRatt.Value
   other-modules:
@@ -54,7 +53,6 @@ executable PropRatt-exe
       PropRatt.Generators
       PropRatt.LTL
       PropRatt.Playground
-      PropRatt.Properties
       PropRatt.Utilities
       PropRatt.Value
       Paths_PropRatt

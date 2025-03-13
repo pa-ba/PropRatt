@@ -36,13 +36,13 @@ data Pred (ts :: [Type]) a where
   Always        :: Pred ts a -> Pred ts a
   Eventually    :: Pred ts a -> Pred ts a
   After         :: Int -> Pred ts a -> Pred ts a
-  Release       :: Pred ts a -> Pred ts a -> Pred ts a 
-  
+  Release       :: Pred ts a -> Pred ts a -> Pred ts a
+
 data Atom (ts :: [Type]) (t :: Type) where
   Pure :: t -> Atom ts t
   Apply :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
   Index :: Lookup ts t -> Atom ts t
-  
+
 data Lookup (ts :: [Type]) (t :: Type) where
   Previous :: Lookup ts t -> Lookup ts t
   First :: Lookup (Value t ': x) t
@@ -54,7 +54,7 @@ data Lookup (ts :: [Type]) (t :: Type) where
   Seventh :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': Value t ': x7) t
   Eigth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value t ': x8) t
   Ninth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value t ': x9) t
-  
+
 instance Functor (Atom ts) where
   fmap f (Pure x) = Pure (f x)
   fmap f (Apply g x) = Apply (fmap (f .) g) x
@@ -70,17 +70,20 @@ x === y = (==) <$> x <*> y
 evalAtom :: Atom ts t -> HList ts -> Maybe' (Value t)
 evalAtom atom hls = case atom of
   Pure x -> Just' (Current (HasTicked True) (x :! Nil))
-  Pure (f :: Value t -> Value r) -> Just' f
-  Apply f x -> evalAtom f hls <*> evalAtom x hls
+  Apply f x ->
+      case (evalAtom f hls, evalAtom x hls) of
+        (Just' (Current _ (f' :! _)), Just' (Current _ (x' :! _))) ->
+          Just' (Current (HasTicked True) (f' x' :! Nil))
+        _ -> Nothing'
   Index lu -> evalLookup lu hls
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
 evalLookup lu hls = case lu of
-  Previous lookup -> 
+  Previous lookup ->
     -- please make Maybe' a monad instance :)
     let m = evalLookup lookup hls
     in case m of
-      Just' (Current b history) -> 
+      Just' (Current b history) ->
         case history of
           _ :! xs -> Just' (Current b xs)
           Nil    -> Nothing'
@@ -119,7 +122,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
     eval = evaluate' timestepsLeft
     smallest = IntSet.findMin
     advance = f (InputValue (smallest cl) ())
-  
+
 evaluate :: (Ord a) => Pred ts a -> Sig (HList ts) -> Bool
 evaluate = evaluate' 20
 

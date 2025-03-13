@@ -12,8 +12,12 @@ module PropRatt.LTL
     Lookup (..),
     SafetyError,
     SafetyPred,
-    (====),
-    (++++)
+    (|+|),
+    (|-|),
+    (|*|),
+    (|<|),
+    (|>|),
+    (|==|)
   )
 where
 
@@ -28,7 +32,7 @@ import PropRatt.Value
 data Pred (ts :: [Type]) a where
   Tautology     :: Pred ts a
   Contradiction :: Pred ts a
-  Now           :: Atom ts a -> Pred ts a
+  Now           :: (a ~ Bool) => Atom ts a -> Pred ts a
   Not           :: Pred ts a -> Pred ts a
   And           :: Pred ts a -> Pred ts a -> Pred ts a
   Or            :: Pred ts a -> Pred ts a -> Pred ts a
@@ -58,26 +62,40 @@ data Lookup (ts :: [Type]) (t :: Type) where
   Ninth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value t ': x9) t
 
 instance Functor (Atom ts) where
-  fmap f (Pure x) = Pure (f x)
-  fmap f (Apply g x) = Apply (fmap (f .) g) x
+  fmap f (Pure x)     = Pure (f x)
+  fmap f (Apply g x)  = Apply (fmap (f .) g) x
+  fmap f (Index lu)   = Apply (Pure f) (Index lu) -- huh
 
 instance Applicative (Atom ts) where
     pure = Pure
     Pure f <*> x = fmap f x
     Apply f g <*> x = Apply (Apply f g) x
 
-x ++++ y = (+) <$> x <*> y
-x ==== y = (==) <$> x <*> y
+(|+|) :: (Applicative f, Num b) => f b -> f b -> f b
+x |+| y = (+) <$> x <*> y
+(|-|) :: (Applicative f, Num b) => f b -> f b -> f b
+x |-| y = (-) <$> x <*> y
+(|*|) :: (Applicative f, Num b) => f b -> f b -> f b
+x |*| y = (*) <$> x <*> y
+(|<|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+x |<| y = (<) <$> x <*> y
+(|>|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+x |>| y = (>) <$> x <*> y
+(|==|) :: (Applicative f, Eq a) => f a -> f a -> f Bool
+x |==| y = (==) <$> x <*> y
 
-evalAtom :: Atom ts t -> HList ts -> Maybe' (Value t)
+evalAtom :: Atom ts t -> HList ts -> Atom ts t
 evalAtom atom hls = case atom of
-  Pure x -> Just' (Current (HasTicked True) (x :! Nil))
+  Pure x -> Pure x  -- Return the Pure value as is
   Apply f x ->
       case (evalAtom f hls, evalAtom x hls) of
-        (Just' (Current _ (f' :! _)), Just' (Current _ (x' :! _))) ->
-          Just' (Current (HasTicked True) (f' x' :! Nil))
-        _ -> Nothing'
-  Index lu -> evalLookup lu hls
+        (Pure f' , Pure x') -> Pure (f' x')  -- Apply function f to x, both evaluated as Pure values
+        _ -> error "undefined"
+  Index lu -> 
+    let m = evalLookup lu hls
+    in case m of 
+      Just' (Current b (h :! t)) -> Pure h
+      Nothing' -> error "hej :)"
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
 evalLookup lu hls = case lu of
@@ -105,7 +123,11 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
   timestepsLeft <= 0 || case formulae of
         Tautology       -> True
         Contradiction   -> False
-        Now atom        -> True
+        Now atom        -> 
+          let m = evalAtom atom x
+          in case m of
+            Pure b -> b
+            _ -> False
         Not phi         -> not (eval phi sig)
         And phi psi     -> eval phi sig && eval psi sig
         Or phi psi      -> eval phi sig || eval psi sig

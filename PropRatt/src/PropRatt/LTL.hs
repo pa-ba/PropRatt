@@ -44,6 +44,8 @@ data Pred (ts :: [Type]) a where
   After         :: Int -> Pred ts a -> Pred ts a
   Release       :: Pred ts a -> Pred ts a -> Pred ts a
 
+
+-- Can we merge atom and lookup..?
 data Atom (ts :: [Type]) (t :: Type) where
   Pure :: t -> Atom ts t
   Apply :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
@@ -53,7 +55,7 @@ data Lookup (ts :: [Type]) (t :: Type) where
   Previous :: Lookup ts t -> Lookup ts t
   First :: Lookup (Value t ': x) t
   Second :: Lookup (x1 ': Value t ': x2) t
-  Third :: Lookup (x1 ': x2': Value t ': x3) t
+  Third :: Lookup (x1 ': x2 ': Value t ': x3) t
   Fourth :: Lookup (x1 ': x2 ': x3 ': Value t ': x4) t
   Fifth :: Lookup (x1 ': x2 ': x3 ': x4 ': Value t ': x5) t
   Sixth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': Value t ': x6) t
@@ -95,8 +97,8 @@ evalAtom atom hls = case atom of
     let m = evalLookup lu hls
     in case m of 
       Just' (Current b (h :! t)) -> Pure h
-      Just' (Current b Nil) -> error "hej :)"
-      Nothing' -> error "hej :)"
+      Just' (Current b Nil) -> error "No History. Buhu :)"
+      Nothing' -> error "No Value, Extra buhu:)" -- Should not be reachable??
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
 evalLookup lu hls = case lu of
@@ -108,7 +110,7 @@ evalLookup lu hls = case lu of
         case history of
           _ :! xs -> Just' (Current b xs)
           Nil    -> Nothing'
-      Nothing' -> Nothing'
+      Nothing' -> Nothing' -- Should not be reachable??
   First         -> Just' (first hls)
   Second        -> Just' (second hls)
   Third         -> Just' (third hls)
@@ -128,7 +130,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
           let m = evalAtom atom x
           in case m of
             Pure b -> b
-            _ -> False
+            _ -> error "hej123"
         Not phi         -> not (eval phi sig)
         And phi psi     -> eval phi sig && eval psi sig
         Or phi psi      -> eval phi sig || eval psi sig
@@ -149,7 +151,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
     advance = f (InputValue (smallest cl) ())
 
 evaluate :: (Ord a) => Pred ts a -> Sig (HList ts) -> Bool
-evaluate = evaluate' 20
+evaluate = evaluate' 5
 
 
 -------------------------------

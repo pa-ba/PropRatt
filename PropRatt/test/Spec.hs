@@ -23,12 +23,25 @@ prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let interleavedSig = interleave (box (+)) (getLater $ first intSignals) (getLater $ second intSignals)
         notALaterSig = 0 ::: interleavedSig
         signalsUnderTest = prepend notALaterSig $ flatten intSignals
-    in evaluate (Next (Always 
-        (Now ((Index First) |==| (Index Second))) 
-        `Or` 
-        (Now ((Index First) |==| (Index Third)))) 
-        `Or` 
-        (Now (((+) <$> (Index Second) <*> (Index Third)) |==| (Index First)))) signalsUnderTest
+    in (evaluate (Next (Always 
+        (Or 
+            (Or 
+                (Now ((Index First) |==| (Index Second))) 
+                (Now ((Index First) |==| (Index Third)))
+            )
+            (Now (((+) <$> (Index Second) <*> (Index Third)) |==| (Index First)))))) signalsUnderTest)
+
+prop_interleave_infix :: Property
+prop_interleave_infix = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+    let interleavedSig = interleave (box (+)) (getLater $ first intSignals) (getLater $ second intSignals)
+        notALaterSig = 0 ::: interleavedSig
+        signalsUnderTest = prepend notALaterSig $ flatten intSignals
+    in (evaluate (Next (Always (
+                ((Now ((Index First) |==| (Index Second))) 
+                `Or`
+                (Now ((Index First) |==| (Index Third))))
+                `Or`
+                (Now (((+) <$> (Index Second) <*> (Index Third)) |==| (Index First)))))) signalsUnderTest)
 
 -- Not in scope rn
 -- Jump property (value is either equal to the original signal or equal to 10 (which is the number of the signal of the dummy function))
@@ -47,8 +60,8 @@ prop_scan :: Property
 prop_scan =  forAll (generateSignals @Int) $ \intSignals -> 
     let prefixSum = scan (box (+)) 0 (first intSignals)
         signalsUnderTest = prepend prefixSum $ flatten intSignals
-    in evaluate (Always 
-        (Now ((Index (Previous First)) |<| (Index First)))) signalsUnderTest
+    in evaluate (Next (Always 
+        (Now ((Index (Previous First)) |<| (Index First))))) signalsUnderTest
 
 -- A switched signal has values equal to the first signal until its values equal values from the third signal
 prop_switchedSignal :: Property
@@ -93,6 +106,7 @@ prop_shouldFail = forAll (generateSignals @Int) $ \intSignals ->
 main :: IO ()
 main = do
     quickCheck prop_interleave
+    quickCheck prop_interleave_infix
     quickCheck prop_switchedSignal
     quickCheck prop_buffer  
     quickCheck prop_zip 

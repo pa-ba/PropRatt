@@ -22,7 +22,9 @@ data Value a where
   Current :: !HasTicked -> !(List a) -> Value a
 
 instance Show a => Show (Value a) where
-  show (Current t h) = show t ++ show h
+  show (Current t Nil) = show t
+  show (Current t (h :! Nil)) = show t ++ "  " ++ show h
+  show (Current t (h :! h2 :! _)) = show t ++ "  " ++ show h ++ "  " ++ show h2
 
 instance Show a => Show (Sig [Value a]) where
   show sig = "Sig [Value a]: " ++ show (takeSigExhaustive sig) ++ "..."

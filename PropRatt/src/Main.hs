@@ -15,23 +15,50 @@ import Test.QuickCheck (generate)
 import AsyncRattus.InternalPrimitives
 import AsyncRattus.Signal
 
+import System.IO.Unsafe (unsafePerformIO)
+
 main :: IO ()
 main = do
-    intSignals <- generate $ generateSignals @[Int, Int]
+    intSignals <- generate $ generateSignals @Int
 
-    let interleavedSig = interleave (box (+)) (getLater $ first intSignals) (getLater $ second intSignals)
+    let jumpFunc = box (\n ->
+            let intSig = unsafePerformIO $ generate $ generateSignals @Int
+                testmakesig = map (box (\_ -> 1)) (first intSig)
+            in if n > 10 then Just' testmakesig else Nothing')
 
-        notALaterSig = 0 ::: interleavedSig
-        signalsUnderTest = prepend notALaterSig $ flatten intSignals
+    let jumpSig = jump jumpFunc (first intSignals)
+    let signalsUnderTest = prepend jumpSig $ flatten intSignals
+
+    print (evaluate (Always ( 
+        (Now ((Index First) |==| (Index Second)))
+        `Or` 
+        (Now ((Index First) |==| (Pure 1))))) signalsUnderTest)
+
+
+
+
+
+
+
+    -- let interleavedSig = interleave (box (+)) (getLater $ first intSignals) (getLater $ second intSignals)
+    --     notALaterSig = 0 ::: interleavedSig
+    --     signalsUnderTest = prepend notALaterSig $ flatten intSignals
+    --     testmakesig = mkSig (box (delay (1)))
+
+
     
-    print signalsUnderTest
-    print (evaluate (Next (Always 
-        ((Now ((Index First) |==| (Index Second))) 
-        `Or` 
-        (Now ((Index First) |==| (Index Third))))
-        `Or` 
-        (Now (((+) <$> (Index Second) <*> (Index Third)) |==| (Index First))))) signalsUnderTest)
+    -- print signalsUnderTest
+    -- print (evaluate (Next (Always (
+    --     ((Now ((Index First) |==| (Index Second))) 
+    --     `Or` 
+    --     (Now ((Index First) |==| (Index Third))))
+    --     `Or` 
+    --     (Now (((+) <$> (Index Second) <*> (Index Third)) |==| (Index First)))))) signalsUnderTest)
 
+
+
+
+    --print (evaluate (Always (Implies (NowHasTicked ((Index Second) |==| (Pure True))) (NowHasTicked ((Index First) |==| (Pure True))))) signalsUnderTest)
 
     -- let bufferedSig = buffer 10 (first intSignals)
     --     signalsUnderTest = prepend bufferedSig $ flatten intSignals

@@ -10,10 +10,11 @@ import PropRatt.Value
 import PropRatt.AsyncRat
 import AsyncRattus.InternalPrimitives
 import PropRatt.Utilities
-import Prelude hiding (zip)
+import Prelude hiding (zip, map)
 import AsyncRattus.Signal
 import GHC.Natural (Natural)
 import AsyncRattus.Strict
+import System.IO.Unsafe (unsafePerformIO)
 
 instance Arbitrary Natural where
   arbitrary = fromIntegral <$> chooseInt (0, 1000)
@@ -43,16 +44,21 @@ prop_interleave_infix = forAll (generateSignals @[Int, Int]) $ \intSignals ->
                 `Or`
                 (Now (((+) <$> (Index Second) <*> (Index Third)) |==| (Index First)))))) signalsUnderTest)
 
--- Not in scope rn
 -- Jump property (value is either equal to the original signal or equal to 10 (which is the number of the signal of the dummy function))
--- prop_jump :: Property
--- prop_jump = forAll (generateSignals @[Int, Int]) $ \intSignals ->
---     let jumpSig = aRatJump (box jumpFunc) (first intSignals)
---         signalsUnderTest = prepend jumpSig $ flatten intSignals
---     in evaluate (Always 
-        -- (Now (Equals (Index First) (Index Second)))
-        -- `Or` 
-        -- (Now (Equals (Index First) (Pure 10)))) signalsUnderTest
+prop_jump :: Property
+prop_jump = forAll (generateSignals @Int) $ \intSignals ->
+   let jumpFunc = box (\n ->
+            let intSig = unsafePerformIO $ generate $ generateSignals @Int
+                testmakesig = map (box (\_ -> 1)) (first intSig)
+            in if n > 10 then Just' testmakesig else Nothing')
+       jumpSig = jump jumpFunc (first intSignals)
+       signalsUnderTest = prepend jumpSig $ flatten intSignals
+
+    in evaluate (Always ( 
+        (Now ((Index First) |==| (Index Second)))
+        `Or` 
+        (Now ((Index First) |==| (Pure 1))))) signalsUnderTest
+
 
 -- prefix sum are monotonically increasing
 -- only holds for nat numbers.. do we need another gen sig?
@@ -110,5 +116,6 @@ main = do
     quickCheck prop_switchedSignal
     quickCheck prop_buffer  
     quickCheck prop_zip 
+    quickCheck prop_jump
     quickCheck prop_scan
     quickCheck prop_shouldFail

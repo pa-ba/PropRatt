@@ -9,31 +9,15 @@ import PropRatt.Generators
 import PropRatt.Value
 import PropRatt.AsyncRat
 import AsyncRattus.InternalPrimitives
-import PropRatt.Utilities
 import Prelude hiding (zip, map)
 import AsyncRattus.Signal
 import GHC.Natural (Natural)
 import AsyncRattus.Strict
 import System.IO.Unsafe (unsafePerformIO)
-
-instance Arbitrary Natural where
-  arbitrary = fromIntegral <$> chooseInt (0, 1000)
+import PropRatt.Utilities (mkSigOne, getLater)
 
 prop_interleave :: Property
 prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
-    let interleavedSig = interleave (box (+)) (getLater $ first intSignals) (getLater $ second intSignals)
-        notALaterSig = 0 ::: interleavedSig
-        signalsUnderTest = prepend notALaterSig $ flatten intSignals
-    in (evaluate (Next (Always 
-        (Or 
-            (Or 
-                (Now ((Index First) |==| (Index Second))) 
-                (Now ((Index First) |==| (Index Third)))
-            )
-            (Now (((+) <$> (Index Second) <*> (Index Third)) |==| (Index First)))))) signalsUnderTest)
-
-prop_interleave_infix :: Property
-prop_interleave_infix = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let interleavedSig = interleave (box (+)) (getLater $ first intSignals) (getLater $ second intSignals)
         notALaterSig = 0 ::: interleavedSig
         signalsUnderTest = prepend notALaterSig $ flatten intSignals
@@ -47,18 +31,13 @@ prop_interleave_infix = forAll (generateSignals @[Int, Int]) $ \intSignals ->
 -- Jump property (value is either equal to the original signal or equal to 10 (which is the number of the signal of the dummy function))
 prop_jump :: Property
 prop_jump = forAll (generateSignals @Int) $ \intSignals ->
-   let jumpFunc = box (\n ->
-            let intSig = unsafePerformIO $ generate $ generateSignals @Int
-                testmakesig = map (box (\_ -> 1)) (first intSig)
-            in if n > 10 then Just' testmakesig else Nothing')
+   let jumpFunc = box (\n -> if n > 10 then Just' mkSigOne else Nothing')
        jumpSig = jump jumpFunc (first intSignals)
        signalsUnderTest = prepend jumpSig $ flatten intSignals
-
     in evaluate (Always ( 
         (Now ((Index First) |==| (Index Second)))
         `Or` 
         (Now ((Index First) |==| (Pure 1))))) signalsUnderTest
-
 
 -- prefix sum are monotonically increasing
 -- only holds for nat numbers.. do we need another gen sig?
@@ -85,11 +64,15 @@ prop_buffer = forAll (generateSignals @Int) $ \intSignals ->
         signalsUnderTest = prepend bufferedSig $ flatten intSignals
     in evaluate (Next (Always (Now ((Index First) |==| (Index (Previous Second)))))) signalsUnderTest
 
--- prop_stop :: Property
--- prop_stop = forAll (generateSignals @Char) $ \intSignals ->
---     let stopped = stop (box (== 'c')) (first intSignals)
---         signalsUnderTest = prepend stopped $ flatten intSignals
---     in evaluate (Always (Implies (Now (Index First |==| Pure 'c')) (Now (Next (Index First) |==| Pure 'c')) )) signalsUnderTest
+-- false positive, does not test anything useful since the stopped signal never ticks
+prop_stop :: Property
+prop_stop = forAll (generateSignals @Bool) $ \intSignals ->
+    let stopped = stop (box (id)) (first intSignals)
+        signalsUnderTest = prepend stopped $ flatten intSignals
+    in evaluate (Always (
+        (Now ((Index First) |==| (Pure True))) 
+        `Implies`
+        (Next (Now ((Index First) |==| (Pure True)))))) signalsUnderTest
 
 -- A zipped signal (first signal) always has fst' values from second signal and snd' values from third signal
 prop_zip :: Property
@@ -112,10 +95,10 @@ prop_shouldFail = forAll (generateSignals @Int) $ \intSignals ->
 main :: IO ()
 main = do
     quickCheck prop_interleave
-    quickCheck prop_interleave_infix
     quickCheck prop_switchedSignal
     quickCheck prop_buffer  
     quickCheck prop_zip 
     quickCheck prop_jump
+    quickCheck prop_stop
     quickCheck prop_scan
     quickCheck prop_shouldFail

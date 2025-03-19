@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module PropRatt.LTL
   ( Pred (..),
@@ -64,12 +65,15 @@ data Lookup (ts :: [Type]) (t :: Type) where
   Ninth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value t ': x9) t
 
 instance Functor (Atom ts) where
+  fmap :: (a -> b) -> Atom ts a -> Atom ts b
   fmap f (Pure x)     = Pure (f x)
   fmap f (Apply g x)  = Apply (fmap (f .) g) x
-  fmap f (Index lu)   = Apply (Pure f) (Index lu) -- huh
+  fmap f (Index lu)   = Apply (Pure f) (Index lu)
 
 instance Applicative (Atom ts) where
+    pure :: a -> Atom ts a
     pure = Pure
+    (<*>) :: Atom ts (a -> b) -> Atom ts a -> Atom ts b
     Pure f <*> x = fmap f x
     Apply f g <*> x = Apply (Apply f g) x
 
@@ -151,8 +155,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
     advance = f (InputValue (smallest cl) ())
 
 evaluate :: (Ord a) => Pred ts a -> Sig (HList ts) -> Bool
-evaluate = evaluate' 5
-
+evaluate = evaluate' 20
 
 -------------------------------
 

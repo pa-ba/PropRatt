@@ -12,11 +12,11 @@ module PropRatt.Utilities (
     isEventuallyEqual,
     getLater,
     sigAEqualsSigB,
+    mkSigOne
 ) where
 
-import AsyncRattus.Strict
 import AsyncRattus.Signal (Sig(..), map)
-import AsyncRattus.InternalPrimitives( O(..), Box(Box), InputValue(InputValue) )
+import AsyncRattus.InternalPrimitives( O(..), InputValue(InputValue) )
 import qualified Data.IntSet as IntSet
 import Prelude hiding (map, zip, zipWith)
 
@@ -94,3 +94,6 @@ isEventuallyEqual (_ ::: Delay clx fx) (Delay cly fy)
 
 getLater :: Sig a -> O (Sig a)
 getLater (_ ::: xs) = xs
+
+mkSigOne :: Sig Int
+mkSigOne = 1 ::: Delay (IntSet.fromList [1]) (\_ -> mkSigOne)

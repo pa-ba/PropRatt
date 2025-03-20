@@ -135,8 +135,8 @@ singleton' sig = singleton'' sig Nil
 
 singleton'' :: (Stable a) => Sig a -> List a -> Sig (HList (Map Value '[a]))
 singleton'' (h ::: t@(Delay cl f)) acc = if IntSet.null cl 
-  then ((HCons (Current (HasTicked True) (h :! acc)) HNil) ::: motherNever) 
-  else (HCons (Current (HasTicked True) (h :! acc)) HNil) ::: delay (singleton'' (adv t) (h :! acc))
+  then HCons (Current (HasTicked True) (h :! acc)) HNil ::: motherNever
+  else HCons (Current (HasTicked True) (h :! acc)) HNil ::: delay (singleton'' (adv t) (h :! acc))
 
 motherNever :: O (Sig (HList (Map Value '[a])))
 motherNever = Delay IntSet.empty (error "Trying to adv on the 'never' delayed computation")

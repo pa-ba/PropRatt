@@ -115,6 +115,10 @@ eigth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h8 _
 ninth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
 ninth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h9 _))))))))) = h9
 
+prependLater :: (Stable a, Stable (HList v), Falsify v) => O (Sig a) -> Sig (HList v) -> Sig (HList (Value a ': v))
+prependLater xs (y ::: ys) =
+  HCons (Current (HasTicked False) Nil) y ::: prependAwait Nil xs y ys
+
 prepend :: (Stable a, Stable (HList v), Falsify v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
 prepend (x ::: xs) (y ::: ys) =
   HCons (Current (HasTicked True) (x :! Nil)) y ::: prependAwait (x :! Nil) xs y ys

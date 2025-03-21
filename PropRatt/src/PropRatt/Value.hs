@@ -18,6 +18,7 @@ instance Stable Int where
 
 newtype HasTicked = HasTicked Bool deriving Show
 
+-- make types instance of num
 data Value a where
   Current :: !HasTicked -> !(List a) -> Value a
 

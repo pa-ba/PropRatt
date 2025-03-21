@@ -12,7 +12,8 @@ module PropRatt.Utilities (
     isEventuallyEqual,
     getLater,
     sigAEqualsSigB,
-    mkSigOne
+    mkSigOne,
+    takeSigAndClock
 ) where
 
 import AsyncRattus.Signal (Sig(..), map)
@@ -36,6 +37,11 @@ takeSigAndClockExhaustive :: Sig a -> [(a, IntSet.IntSet)]
 takeSigAndClockExhaustive (x ::: Delay cl f)
     | IntSet.null cl = [(x, cl)]
     | otherwise = (x, cl) : takeSigAndClockExhaustive (f (InputValue (pickSmallestClock cl) ()))
+
+takeSigAndClock :: Int -> Sig a -> [(a, IntSet.IntSet)]
+takeSigAndClock n (x ::: Delay cl f) = case n of
+    0 -> [(x, cl)]
+    _ -> (x, cl) : takeSigAndClock (n-1) (f (InputValue (pickSmallestClock cl) ()))
 
 sizeSig :: Sig a -> Int -> Int
 sizeSig (_ ::: Delay cl f) acc

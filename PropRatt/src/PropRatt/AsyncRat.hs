@@ -143,3 +143,8 @@ motherNever = Delay IntSet.empty (error "Trying to adv on the 'never' delayed co
 
 generateSignals :: forall a. HListGen (ToList a) => Gen (HList (Map Sig (ToList a)))
 generateSignals = generateHList @(ToList a)
+
+filter'' :: Box (a -> Bool) -> Sig a -> Sig (Maybe' a)
+filter'' f (x ::: xs) = if unbox f x
+  then Just' x ::: delay (filter'' f (adv xs))
+  else Nothing' ::: delay (filter'' f (adv xs))

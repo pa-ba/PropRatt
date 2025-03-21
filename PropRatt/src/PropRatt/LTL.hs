@@ -1,10 +1,14 @@
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-{-# LANGUAGE GADTs, DataKinds, KindSignatures, MultiParamTypeClasses, RankNTypes #-}
+{-# LANGUAGE GADTs, DataKinds, MultiParamTypeClasses, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 module PropRatt.LTL
   ( Pred (..),
@@ -18,7 +22,8 @@ module PropRatt.LTL
     (|*|),
     (|<|),
     (|>|),
-    (|==|)
+    (|==|),
+    checkScope,
   )
 where
 
@@ -45,8 +50,6 @@ data Pred (ts :: [Type]) a where
   After         :: Int -> Pred ts a -> Pred ts a
   Release       :: Pred ts a -> Pred ts a -> Pred ts a
 
-
--- Can we merge atom and lookup..?
 data Atom (ts :: [Type]) (t :: Type) where
   Pure :: t -> Atom ts t
   Apply :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
@@ -63,6 +66,42 @@ data Lookup (ts :: [Type]) (t :: Type) where
   Seventh :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': Value t ': x7) t
   Eigth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value t ': x8) t
   Ninth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value t ': x9) t
+
+checkScope :: Pred ts t -> Bool
+checkScope p = checkPred p 0
+
+checkPred :: Pred ts t -> Int -> Bool
+checkPred predicate steps =
+  steps >= 0 &&
+  case predicate of
+    Tautology       -> valid steps
+    Contradiction   -> valid steps
+    Now atom        -> valid (checkAtom atom steps)
+    Not p           -> checkPred p steps
+    And p1 p2       -> checkPred p1 steps && checkPred p2 steps
+    Or p1 p2        -> checkPred p1 steps || checkPred p2 steps
+    Until p1 p2     -> checkPred p1 steps && checkPred p2 steps
+    Next p          -> checkPred p (steps + 1)
+    Implies p1 p2   -> checkPred p1 steps && checkPred p2 steps
+    Release p1 p2   -> checkPred p1 steps && checkPred p2 steps
+    Always p        -> checkPred p steps
+    Eventually p    -> checkPred p steps
+    After _ p       -> checkPred p steps
+  where
+    valid s = s >= 0
+
+checkAtom :: Atom ts t -> Int -> Int
+checkAtom atom steps =
+  case atom of
+    Pure _        -> steps
+    Apply fun arg -> min (checkAtom fun steps) (checkAtom arg steps)
+    Index lookup  -> checkLookup lookup steps
+
+checkLookup :: Lookup ts t -> Int -> Int
+checkLookup lookup steps =
+  case lookup of
+    Previous lookup'  -> checkLookup lookup' (steps - 1)
+    _                 -> steps
 
 instance Functor (Atom ts) where
   fmap :: (a -> b) -> Atom ts a -> Atom ts b
@@ -92,14 +131,14 @@ x |==| y = (==) <$> x <*> y
 
 evalAtom :: Atom ts t -> HList ts -> Atom ts t
 evalAtom atom hls = case atom of
-  Pure x -> Pure x 
+  Pure x -> Pure x
   Apply f x ->
       case (evalAtom f hls, evalAtom x hls) of
         (Pure f' , Pure x') -> Pure (f' x')
         _ -> error "Atomic statement cannot be partially applied"
-  Index lu -> 
+  Index lu ->
     let m = evalLookup lu hls
-    in case m of 
+    in case m of
       Just' (Current b (h :! t)) -> Pure h
       Just' (Current b Nil) -> error "No History. Buhu :)"
       Nothing' -> error "No Value, Extra buhu:)" -- Should not be reachable??
@@ -130,7 +169,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
   timestepsLeft <= 0 || case formulae of
         Tautology       -> True
         Contradiction   -> False
-        Now atom        -> 
+        Now atom        ->
           let m = evalAtom atom x
           in case m of
             Pure b -> b

@@ -106,6 +106,14 @@ prop_ticked = forAll (generateSignals @Int) $ \charSignals ->
       result        = evaluate predicate state
   in result
 
+prop_trigger_maybe :: Property
+prop_trigger_maybe = forAll (generateSignals @[Int, Int]) $ \charSignals ->
+  let triggered      = triggerMaybe (box (+)) (first charSignals) (second charSignals)
+      state         = prepend triggered $ flatten charSignals
+      predicate     = Always (NowHasTicked ((Ticked First) |==| ((Pure True)))) -- Always (Implies (NowHasTicked ((Index Second) |==| (Pure True))) (NowHasTicked ((Index First) |==| (Pure (Just' False)))))
+      result        = evaluate predicate state
+  in result
+
 main :: IO ()
 main = do
     quickCheck prop_interleave

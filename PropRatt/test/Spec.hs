@@ -102,7 +102,7 @@ prop_ticked :: Property
 prop_ticked = forAll (generateSignals @Int) $ \charSignals ->
   let filtered      = filter'' (box (>= 10)) (first charSignals)
       state         = prepend filtered $ flatten charSignals
-      predicate     = Always (Now ((Index (Ticked First)) |==| ((Pure (True)))))
+      predicate     = Always (Now ((Index (Ticked First)) |==| ((Pure True))))
       result        = evaluate predicate state
   in result
 
@@ -110,7 +110,7 @@ prop_trigger_maybe :: Property
 prop_trigger_maybe = forAll (generateSignals @[Int, Int]) $ \charSignals ->
   let triggered      = triggerMaybe (box (+)) (first charSignals) (second charSignals)
       state         = prepend triggered $ flatten charSignals
-      predicate     = Always (Now (Index (Ticked First) |==| ((Pure True)))) -- Always (Implies (NowHasTicked ((Index Second) |==| (Pure True))) (NowHasTicked ((Index First) |==| (Pure (Just' False)))))
+      predicate     = Always (Implies (Now (Index (Ticked Second) |==| (Pure True))) (Now (Index (Ticked First) |==| (Pure True))))
       result        = evaluate predicate state
   in result
 

@@ -110,7 +110,7 @@ prop_trigger_maybe :: Property
 prop_trigger_maybe = forAll (generateSignals @[Int, Int]) $ \charSignals ->
   let triggered      = triggerMaybe (box (+)) (first charSignals) (second charSignals)
       state         = prepend triggered $ flatten charSignals
-      predicate     = Always (NowHasTicked ((Ticked First) |==| ((Pure True)))) -- Always (Implies (NowHasTicked ((Index Second) |==| (Pure True))) (NowHasTicked ((Index First) |==| (Pure (Just' False)))))
+      predicate     = Always (Now (Index (Ticked First) |==| ((Pure True)))) -- Always (Implies (NowHasTicked ((Index Second) |==| (Pure True))) (NowHasTicked ((Index First) |==| (Pure (Just' False)))))
       result        = evaluate predicate state
   in result
 
@@ -125,3 +125,4 @@ main = do
     quickCheck prop_scan
     quickCheck prop_filter
     quickCheck prop_ticked
+    quickCheck prop_trigger_maybe

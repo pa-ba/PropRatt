@@ -148,3 +148,14 @@ filter'' :: Box (a -> Bool) -> Sig a -> Sig (Maybe' a)
 filter'' f (x ::: xs) = if unbox f x
   then Just' x ::: delay (filter'' f (adv xs))
   else Nothing' ::: delay (filter'' f (adv xs))
+
+
+triggerMaybe :: (Stable a, Stable b) => Box (a -> b -> c) -> Sig a -> Sig b -> Sig (Maybe' c)
+triggerMaybe f (a ::: as) bs@(b:::_) = Just' (unbox f a b) ::: (triggerAwaitMaybe f as bs)
+
+triggerAwaitMaybe :: Stable b => Box (a -> b -> c) -> O (Sig a) -> Sig b -> O (Sig (Maybe' c))
+triggerAwaitMaybe f as (b:::bs) = delay (case select as bs of
+            Fst (a' ::: as') bs' -> Just' (unbox f a' b) ::: triggerAwaitMaybe f as' (b ::: bs')
+            Snd as' bs' -> Nothing' ::: triggerAwaitMaybe f as' bs'
+            Both (a' ::: as') (b' ::: bs') -> Just' (unbox f a' b') ::: triggerAwaitMaybe f as' (b' ::: bs')
+          )

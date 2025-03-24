@@ -24,7 +24,6 @@ import PropRatt.Value (Value)
 main :: IO ()
 main = do
     print "hej"
-    print test
     --print $ takeSigAndClock 20 (signalsUnderTest)
     --print intSignals
     --print (evaluate (Always (Next (Now ((Index First) |<| (Pure 100000))))) signalsUnderTest) 

@@ -95,7 +95,14 @@ prop_filter = forAll (generateSignals @Int) $ \charSignals ->
   let filtered      = filter'' (box (>= 10)) (first charSignals)
       state         = prepend filtered $ flatten charSignals
       predicate     = Always (Now ((Index First) |>| ((Pure (Just' 9)))))
-      prevCheck     = checkScope predicate
+      result        = evaluate predicate state
+  in result
+
+prop_ticked :: Property
+prop_ticked = forAll (generateSignals @Int) $ \charSignals ->
+  let filtered      = filter'' (box (>= 10)) (first charSignals)
+      state         = prepend filtered $ flatten charSignals
+      predicate     = Always (Now ((Index (Ticked First)) |==| ((Pure (True)))))
       result        = evaluate predicate state
   in result
 
@@ -109,3 +116,4 @@ main = do
     quickCheck prop_stop
     quickCheck prop_scan
     quickCheck prop_filter
+    quickCheck prop_ticked

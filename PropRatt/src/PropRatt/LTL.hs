@@ -56,7 +56,9 @@ data Atom (ts :: [Type]) (t :: Type) where
   Index :: Lookup ts t -> Atom ts t
 
 data Lookup (ts :: [Type]) (t :: Type) where
+  Ticked :: Lookup ts t -> Lookup ts Bool
   Previous :: Lookup ts t -> Lookup ts t
+  Prior :: Int -> Lookup ts t -> Lookup ts t
   First :: Lookup (Value t ': x) t
   Second :: Lookup (x1 ': Value t ': x2) t
   Third :: Lookup (x1 ': x2 ': Value t ': x3) t
@@ -101,6 +103,7 @@ checkLookup :: Lookup ts t -> Int -> Int
 checkLookup lookup steps =
   case lookup of
     Previous lookup'  -> checkLookup lookup' (steps - 1)
+    Prior n lookup'   -> checkLookup lookup' (steps - n)
     _                 -> steps
 
 instance Functor (Atom ts) where
@@ -145,24 +148,37 @@ evalAtom atom hls = case atom of
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
 evalLookup lu hls = case lu of
-  Previous lookup ->
-    -- please make Maybe' a monad instance :)
-    let m = evalLookup lookup hls
-    in case m of
+  Ticked lu       ->  
+    case evalLookup lu hls of
+      Just' (Current (HasTicked b') _) -> Just' (Current (HasTicked b') (b' :! Nil))
+      Nothing' -> Nothing'
+  Previous lu ->
+    case evalLookup lu hls of
       Just' (Current b history) ->
         case history of
           _ :! xs -> Just' (Current b xs)
-          Nil    -> Nothing'
-      Nothing' -> Nothing' -- Should not be reachable??
+          Nil     -> Nothing'
+      Nothing' -> Nothing'
+  Prior n lu -> case evalLookup lu hls of
+    Just' v -> nthPrevious n v
+    Nothing' -> Nothing'
   First         -> Just' (first hls)
   Second        -> Just' (second hls)
   Third         -> Just' (third hls)
-  Fourth       -> Just' (fourth hls)
-  Fifth        -> Just' (fifth hls)
-  Sixth        -> Just' (sixth hls)
-  Seventh      -> Just' (seventh hls)
-  Eigth        -> Just' (eigth hls)
-  Ninth        -> Just' (ninth hls)
+  Fourth        -> Just' (fourth hls)
+  Fifth         -> Just' (fifth hls)
+  Sixth         -> Just' (sixth hls)
+  Seventh       -> Just' (seventh hls)
+  Eigth         -> Just' (eigth hls)
+  Ninth         -> Just' (ninth hls)
+
+nthPrevious :: Int -> Value t -> Maybe' (Value t)
+nthPrevious n curr@(Current b history)
+  | n <= 0    = Just' curr
+  | otherwise =
+      case history of
+        _ :! xs -> nthPrevious (n - 1) (Current b xs)
+        Nil     -> Nothing'
 
 evaluate' :: (Ord a) => Int -> Pred ts a -> Sig (HList ts) -> Bool
 evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
@@ -186,7 +202,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
                             && not (timestepsLeft == 1 && not (eval phi sig))
         Release phi psi -> (eval psi sig && eval phi sig)
                             || (eval psi sig && evaluateNext (phi `Until` psi) advance)
-        After n phi      -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
+        After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
   where
     evaluateNext = evaluate' (timestepsLeft - 1)
     eval = evaluate' timestepsLeft

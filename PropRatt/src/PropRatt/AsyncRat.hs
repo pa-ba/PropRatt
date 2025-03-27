@@ -109,8 +109,8 @@ sixth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h6 _)))))) = h6
 seventh :: HList (_ ':_ ': _ ': _ ': _ ': _ ': a ': _) -> a
 seventh (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h7 _))))))) = h7
 
-eigth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
-eigth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h8 _)))))))) = h8
+eighth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
+eighth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h8 _)))))))) = h8
 
 ninth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
 ninth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h9 _))))))))) = h9
@@ -149,9 +149,8 @@ filter'' f (x ::: xs) = if unbox f x
   then Just' x ::: delay (filter'' f (adv xs))
   else Nothing' ::: delay (filter'' f (adv xs))
 
-
 triggerMaybe :: (Stable a, Stable b) => Box (a -> b -> c) -> Sig a -> Sig b -> Sig (Maybe' c)
-triggerMaybe f (a ::: as) bs@(b:::_) = Just' (unbox f a b) ::: (triggerAwaitMaybe f as bs)
+triggerMaybe f (a ::: as) bs@(b:::_) = Just' (unbox f a b) ::: triggerAwaitMaybe f as bs
 
 triggerAwaitMaybe :: Stable b => Box (a -> b -> c) -> O (Sig a) -> Sig b -> O (Sig (Maybe' c))
 triggerAwaitMaybe f as (b:::bs) = delay (case select as bs of

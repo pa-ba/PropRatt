@@ -13,9 +13,6 @@ import Prelude hiding (zip, map, filter)
 import AsyncRattus.Signal
 import AsyncRattus.Strict
 import PropRatt.Utilities (mkSigOne, getLater)
-import Test.QuickCheck.Monadic (run, assert, pick, monadicIO)
-import PropRatt.AsyncRat (prependLater)
-import PropRatt.LTL (checkScope)
 
 prop_interleave :: Property
 prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
@@ -26,7 +23,7 @@ prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
                                         `Or`
                                         (Now ((Index First) |==| (Index Third))))
                                         `Or`
-                                        (Now (((Index Second) |+| (Index Third)) |==| (Index First)))))
+                                        (Now (((Index Second) + (Index Third)) |==| (Index First)))))
         result          = evaluate predicate state
     in result
 

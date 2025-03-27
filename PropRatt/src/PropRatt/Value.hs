@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables, UndecidableInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module PropRatt.Value where
 import AsyncRattus.Strict
@@ -18,9 +19,21 @@ instance Stable Int where
 
 newtype HasTicked = HasTicked Bool deriving Show
 
--- make types instance of num
+-- make value a functor?
 data Value a where
   Current :: !HasTicked -> !(List a) -> Value a
+
+instance Num a => Num (Value a) where
+  (+) v1 v2 = pureVal (current v1 + current v2)
+  (-) v1 v2 = pureVal (current v1 - current v2)
+  (*) v1 v2 = pureVal (current v1 * current v2)
+  negate v  = pureVal (negate (current v))
+  abs v     = pureVal (abs (current v))
+  signum v  = pureVal (signum (current v))
+  fromInteger n = pureVal (fromInteger n)
+
+pureVal :: a -> Value a
+pureVal x = Current (HasTicked False) (x :! Nil)
 
 instance Show a => Show (Value a) where
   show (Current t Nil) = show t
@@ -30,18 +43,15 @@ instance Show a => Show (Value a) where
 instance Show a => Show (Sig [Value a]) where
   show sig = "Sig [Value a]: " ++ show (takeSigExhaustive sig) ++ "..."
 
-instance Ord a => Ord (Value a) where 
-    (Current b1 (a1 :! xs)) `compare` (Current b2 (a2 :! ys)) = a1 `compare` a2
+instance Ord a => Ord (Value a) where
+  compare v1 v2 = compare (current v1) (current v2)
 
 instance Eq a => Eq (Value a) where
-  (Current _ Nil) == (Current _ Nil) = True
-  (Current _ Nil) == _ = False
-  _ == (Current _ Nil) = False
-  (Current b1 (a1 :! xs)) == (Current b2 (a2 :! ys)) = a1 == a2
+  v1 == v2 = current v1 == current v2
 
-current' :: Value a -> a
-current' (Current _ (h :! _)) = h
-current' _ = undefined
+current :: Value a -> a
+current (Current _ (h :! _)) = h
+current _ = undefined
 
 previous :: Value a -> a
 previous (Current _ (_ :! Nil)) = undefined
@@ -52,6 +62,3 @@ past :: Int -> Value a -> a
 past _ (Current _ Nil) = undefined
 past 0 (Current _ (h :! _)) = h 
 past n (Current a (_ :! t)) = past (n-1) (Current a t)
-
-(?=) :: Eq a => Value a -> Value a -> Bool
-a ?= b = current' a == current' b

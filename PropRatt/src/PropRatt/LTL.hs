@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module PropRatt.LTL
   ( Pred (..),
@@ -17,9 +18,6 @@ module PropRatt.LTL
     Lookup (..),
     SafetyError,
     SafetyPred,
-    (|+|),
-    (|-|),
-    (|*|),
     (|<|),
     (|>|),
     (|==|),
@@ -66,8 +64,44 @@ data Lookup (ts :: [Type]) (t :: Type) where
   Fifth :: Lookup (x1 ': x2 ': x3 ': x4 ': Value t ': x5) t
   Sixth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': Value t ': x6) t
   Seventh :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': Value t ': x7) t
-  Eigth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value t ': x8) t
+  Eighth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value t ': x8) t
   Ninth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value t ': x9) t
+
+instance Functor (Atom ts) where
+  fmap :: (a -> b) -> Atom ts a -> Atom ts b
+  fmap f (Pure x)     = Pure (f x)
+  fmap f (Apply g x)  = Apply (fmap (f .) g) x
+  fmap f (Index lu)   = Apply (Pure f) (Index lu)
+
+instance Applicative (Atom ts) where
+    pure :: a -> Atom ts a
+    pure = Pure
+    (<*>) :: Atom ts (a -> b) -> Atom ts a -> Atom ts b
+    Pure f <*> x = fmap f x              
+    Apply f g <*> x = Apply (Apply f g) x
+
+instance Num t => Num (Atom ts t) where
+  (+) :: Atom ts t -> Atom ts t -> Atom ts t
+  (+) x y = (+) <$> x <*> y
+  (-) :: Atom ts t -> Atom ts t -> Atom ts t
+  (-) x y = (-) <$> x <*> y
+  (*) :: Atom ts t -> Atom ts t -> Atom ts t
+  (*) x y = (*) <$> x <*> y
+  negate :: Atom ts t -> Atom ts t
+  negate = fmap negate
+  abs :: Atom ts t -> Atom ts t
+  abs = fmap abs
+  signum :: Atom ts t -> Atom ts t
+  signum = fmap signum
+  fromInteger :: Integer -> Atom ts t
+  fromInteger n = pure (fromInteger n)
+  
+(|<|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+x |<| y = (<) <$> x <*> y
+(|>|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+x |>| y = (>) <$> x <*> y
+(|==|) :: (Applicative f, Eq a) => f a -> f a -> f Bool
+x |==| y = (==) <$> x <*> y
 
 checkScope :: Pred ts t -> Bool
 checkScope p = checkPred p 0
@@ -106,49 +140,26 @@ checkLookup lookup steps =
     Prior n lookup'   -> checkLookup lookup' (steps - n)
     _                 -> steps
 
-instance Functor (Atom ts) where
-  fmap :: (a -> b) -> Atom ts a -> Atom ts b
-  fmap f (Pure x)     = Pure (f x)
-  fmap f (Apply g x)  = Apply (fmap (f .) g) x
-  fmap f (Index lu)   = Apply (Pure f) (Index lu)
-
-instance Applicative (Atom ts) where
-    pure :: a -> Atom ts a
-    pure = Pure
-    (<*>) :: Atom ts (a -> b) -> Atom ts a -> Atom ts b
-    Pure f <*> x = fmap f x
-    Apply f g <*> x = Apply (Apply f g) x
-
-(|+|) :: (Applicative f, Num b) => f b -> f b -> f b
-x |+| y = (+) <$> x <*> y
-(|-|) :: (Applicative f, Num b) => f b -> f b -> f b
-x |-| y = (-) <$> x <*> y
-(|*|) :: (Applicative f, Num b) => f b -> f b -> f b
-x |*| y = (*) <$> x <*> y
-(|<|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
-x |<| y = (<) <$> x <*> y
-(|>|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
-x |>| y = (>) <$> x <*> y
-(|==|) :: (Applicative f, Eq a) => f a -> f a -> f Bool
-x |==| y = (==) <$> x <*> y
+nthPrevious :: Int -> Value t -> Maybe' (Value t)
+nthPrevious n curr@(Current b history)
+  | n <= 0    = Just' curr
+  | otherwise =
+      case history of
+        _ :! xs -> nthPrevious (n - 1) (Current b xs)
+        Nil     -> Nothing'
 
 evalAtom :: Atom ts t -> HList ts -> Atom ts t
-evalAtom atom hls = case atom of
-  Pure x -> Pure x
-  Apply f x ->
-      case (evalAtom f hls, evalAtom x hls) of
-        (Pure f' , Pure x') -> Pure (f' x')
-        _ -> error "Atomic statement cannot be partially applied"
-  Index lu ->
-    let m = evalLookup lu hls
-    in case m of
-      Just' (Current b (h :! t)) -> Pure h
-      Just' (Current b Nil) -> error "No History. Buhu :)"
-      Nothing' -> error "No Value, Extra buhu:)" -- Should not be reachable??
+evalAtom (Pure x) _       = pure x
+evalAtom (Apply f x) hls  = (($) <$> evalAtom f hls) <*> evalAtom x hls
+evalAtom (Index lu) hls =
+  case evalLookup lu hls of
+    Just' (Current b (h :! t))  -> pure h
+    Just' (Current b Nil)       -> error "No History. Buhu :)"
+    Nothing'                    -> error "No Value, Extra buhu:)"
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
 evalLookup lu hls = case lu of
-  Ticked lu       ->  
+  Ticked lu       ->
     case evalLookup lu hls of
       Just' (Current (HasTicked b') _) -> Just' (Current (HasTicked b') (b' :! Nil))
       Nothing' -> Nothing'
@@ -169,16 +180,8 @@ evalLookup lu hls = case lu of
   Fifth         -> Just' (fifth hls)
   Sixth         -> Just' (sixth hls)
   Seventh       -> Just' (seventh hls)
-  Eigth         -> Just' (eigth hls)
+  Eighth        -> Just' (eighth hls)
   Ninth         -> Just' (ninth hls)
-
-nthPrevious :: Int -> Value t -> Maybe' (Value t)
-nthPrevious n curr@(Current b history)
-  | n <= 0    = Just' curr
-  | otherwise =
-      case history of
-        _ :! xs -> nthPrevious (n - 1) (Current b xs)
-        Nil     -> Nothing'
 
 evaluate' :: (Ord a) => Int -> Pred ts a -> Sig (HList ts) -> Bool
 evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =

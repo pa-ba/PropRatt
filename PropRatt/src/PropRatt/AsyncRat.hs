@@ -22,6 +22,7 @@ module PropRatt.AsyncRat where
 import AsyncRattus.Signal hiding (mkSig)
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
+import PropRatt.Generators
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Value
 import Data.Kind (Type)
@@ -118,6 +119,17 @@ ninth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (H
 prependLater :: (Stable a, Stable (HList v), Falsify v) => O (Sig a) -> Sig (HList v) -> Sig (HList (Value a ': v))
 prependLater xs (y ::: ys) =
   HCons (Current (HasTicked False) Nil) y ::: prependAwait Nil xs y ys
+
+prependFixed :: (Stable a, Stable (HList v), Falsify v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
+prependFixed (x ::: Delay _ f) (y ::: ys) =
+  HCons (Current (HasTicked True) (x :! Nil)) y ::: prependAwait (x :! Nil) (Delay (IntSet.singleton 6) f) y ys
+
+prependAwaitFixed :: (Stable a, Stable ls, ls ~ HList v, Falsify v) => List a -> O (Sig a) -> ls -> O (Sig ls) -> O (Sig (HList (Value a ': v)))
+prependAwaitFixed x xs y ys  = delay (
+  case select xs ys of
+     Fst (x' ::: xs')   ys'         -> (Current (HasTicked True) (x' :! x) %: toFalse y) ::: prependAwait (x':!x) xs' y ys'
+     Snd xs'@(Delay _ f) (y' ::: ys')           -> (Current (HasTicked False) x %: y') ::: prependAwait x (Delay (IntSet.singleton 6) f) y' ys'
+     Both (x' ::: xs'@(Delay _ f)) (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y') ::: prependAwait (x':!x) (Delay (IntSet.singleton 6) f) y' ys')
 
 prepend :: (Stable a, Stable (HList v), Falsify v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
 prepend (x ::: xs) (y ::: ys) =

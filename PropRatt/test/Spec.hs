@@ -40,6 +40,19 @@ prop_jump = forAll (generateSignals @Int) $ \intSignals ->
         result      = evaluate predicate state
     in result
 
+prop_jump2 :: Property
+prop_jump2 = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+   let  jumpFunc    = box (\n -> if n > 10 then Just' (second (intSignals)) else Nothing')
+        jumpSig     = jump jumpFunc (first intSignals)
+        -- 1 jumpSig
+        -- 2 const
+        -- 3 first intsig
+        -- 4 const med tick
+        state       = prepend jumpSig $ prependFixed (second intSignals) $ flatten intSignals
+        predicate   = Always $ Implies (Now (Index Third |>| (Pure 10))) (Always (TickConst (Now ((Index First) |==| (Index Second)))))
+        result      = evaluate predicate state
+    in result
+
 -- prefix sum are monotonically increasing
 -- only holds for nat numbers.. do we need another gen sig?
 
@@ -132,3 +145,4 @@ main = do
     quickCheck prop_ticked
     quickCheck prop_trigger_maybe
     quickCheck prop_map_gt
+    quickCheck prop_jump2

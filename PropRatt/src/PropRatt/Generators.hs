@@ -17,7 +17,7 @@ import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith
 
 instance (Arbitrary a) => Arbitrary (Sig a) where
   arbitrary = do
-    len <- choose (30, 50)
+    len <- choose (200, 300)
     arbitrarySig len
 
 newtype Natural = Natural Int

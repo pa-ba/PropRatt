@@ -49,6 +49,7 @@ data Pred (ts :: [Type]) a where
   Eventually    :: Pred ts a -> Pred ts a
   After         :: Int -> Pred ts a -> Pred ts a
   Release       :: Pred ts a -> Pred ts a -> Pred ts a
+  TickConst     :: Pred ts a -> Pred ts a
 
 data Atom (ts :: [Type]) (t :: Type) where
   Pure :: t -> Atom ts t
@@ -229,14 +230,17 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
         Release phi psi -> (eval psi sig && eval phi sig)
                             || (eval psi sig && evaluateNext (phi `Until` psi) advance)
         After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
+        TickConst phi   -> evaluateNext phi advanceMax
   where
     evaluateNext = evaluate' (timestepsLeft - 1)
     eval = evaluate' timestepsLeft
     smallest = IntSet.findMin
+    greatest = IntSet.findMax
     advance = f (InputValue (smallest cl) ())
+    advanceMax = f (InputValue (greatest cl) ())
 
 evaluate :: (Ord a) => Pred ts a -> Sig (HList ts) -> Bool
-evaluate = evaluate' 20
+evaluate = evaluate' 200
 
 -------------------------------
 

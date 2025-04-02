@@ -1,5 +1,5 @@
 {-# OPTIONS -fplugin=AsyncRattus.Plugin #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications, FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
 {-# HLINT ignore "Redundant bracket" #-}
 
@@ -13,6 +13,8 @@ import Prelude hiding (zip, map, filter)
 import AsyncRattus.Signal
 import AsyncRattus.Strict
 import PropRatt.Utilities
+
+instance Stable (Sig Int) where
 
 prop_interleave :: Property
 prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
@@ -39,6 +41,19 @@ prop_jump = forAll (generateSignals @Int) $ \intSignals ->
                         Now ((Index First) |==| (Pure 1))
         result      = evaluate predicate state
     in result
+
+-- prop_jump2 :: (Stable ts, Stable s, s ~ Sig Int, ts ~ HList '[s, s]) => Property
+-- prop_jump2 = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+--    let  jumpFunc    = box (\n -> if n > 10 then Just' (second (intSignals)) else Nothing')
+--         jumpSig     = jump jumpFunc (first intSignals)
+--         -- 1 jumpSig
+--         -- 2 const
+--         -- 3 first intsig
+--         -- 4 const med tick
+--         state       = prepend jumpSig $ prependFixed (second intSignals) $ flatten intSignals
+--         predicate   = Always $ Implies (Now (Index Third |>| (Pure 10))) (Always (TickConst (Now ((Index First) |==| (Index Second)))))
+--         result      = evaluate predicate state
+--     in result
 
 -- prefix sum are monotonically increasing
 -- only holds for nat numbers.. do we need another gen sig?
@@ -118,6 +133,18 @@ prop_map_gt = forAll (generateSignals @Int) $ \intSignal ->
         result      = evaluate predicate state
     in result
 
+
+prop_range :: Bool
+prop_range = 
+    let gSig  = makeGrowthSig mkNats
+        state = flatten (HCons gSig HNil)
+        pred0 = Now ((Index First) |==| (Pure (0.0 :: Float)))
+        pred1 = After 1 (Now ((Index First) |<| (Pure 10.0)))
+        -- pred2 = After 10 (And ((Now ((Index First) |<| (Pure (100.0 :: Float))))) ((Now ((Index First) |>| (Pure (0.0 :: Float))))))
+        -- pred3 = After 70 (Now ((Index First) |>| (Pure 20.0)))
+        result = evaluate pred0 state -- && evaluate pred1 state && evaluate pred2 state -- && evaluate pred3 state
+    in result
+
 prop_parallel :: Property
 prop_parallel = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let paralleled  = parallel (first intSignals) (second intSignals)
@@ -170,6 +197,7 @@ main = do
     quickCheck prop_ticked
     quickCheck prop_trigger_maybe
     quickCheck prop_map_gt
+    quickCheck prop_range
     quickCheck prop_parallel
     quickCheck prop_is_stuttering
     quickCheck prop_is_monotonic

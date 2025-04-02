@@ -22,6 +22,7 @@ module PropRatt.AsyncRat where
 import AsyncRattus.Signal hiding (mkSig)
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
+import PropRatt.Generators
 import AsyncRattus.Plugin.Annotation
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Value
@@ -120,6 +121,17 @@ prependLater :: (Stable a, Stable (HList v), Falsify v) => O (Sig a) -> Sig (HLi
 prependLater xs (y ::: ys) =
   HCons (Current (HasTicked False) Nil) y ::: prependAwait Nil xs y ys
 
+prependFixed :: (Stable a, Stable (HList v), Falsify v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
+prependFixed (x ::: Delay _ f) (y ::: ys) =
+  HCons (Current (HasTicked True) (x :! Nil)) y ::: prependAwait (x :! Nil) (Delay (IntSet.singleton 6) f) y ys
+
+prependAwaitFixed :: (Stable a, Stable ls, ls ~ HList v, Falsify v) => List a -> O (Sig a) -> ls -> O (Sig ls) -> O (Sig (HList (Value a ': v)))
+prependAwaitFixed x xs y ys  = delay (
+  case select xs ys of
+     Fst (x' ::: xs')   ys'         -> (Current (HasTicked True) (x' :! x) %: toFalse y) ::: prependAwait (x':!x) xs' y ys'
+     Snd xs'@(Delay _ f) (y' ::: ys')           -> (Current (HasTicked False) x %: y') ::: prependAwait x (Delay (IntSet.singleton 6) f) y' ys'
+     Both (x' ::: xs'@(Delay _ f)) (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y') ::: prependAwait (x':!x) (Delay (IntSet.singleton 6) f) y' ys')
+     
 {-# ANN lengthH AllowRecursion #-}
 lengthH :: HList ts -> Int -> Int
 lengthH HNil n = n
@@ -166,3 +178,16 @@ triggerAwaitMaybe f as (b:::bs) = delay (case select as bs of
             Fst (a' ::: as') bs' -> Just' (unbox f a' b) ::: triggerAwaitMaybe f as' (b ::: bs')
             Snd as' bs' -> Nothing' ::: triggerAwaitMaybe f as' bs'
             Both (a' ::: as') (b' ::: bs') -> Just' (unbox f a' b') ::: triggerAwaitMaybe f as' (b' ::: bs'))
+
+mkNats :: (Stable a, Floating a) => Sig a
+mkNats = scan (box (\a _ -> a + 1)) (-1) (const (0))
+
+saturatingGrowth :: Floating a => a -> a -> a -> a
+saturatingGrowth y_min y_max x =
+  y_min + (y_max - y_min) * (1 - exp (-x*0.1))
+
+growth :: Floating a => a -> a
+growth x = saturatingGrowth 0 100 x
+
+makeGrowthSig :: Floating a => Sig a -> Sig a
+makeGrowthSig (x ::: xs) = growth x ::: delay (makeGrowthSig (adv xs))

@@ -41,7 +41,7 @@ instance Show a => Show (Value a) where
   show (Current t (h :! h2 :! _)) = show t ++ "  " ++ show h ++ "  " ++ show h2
 
 instance Show a => Show (Sig [Value a]) where
-  show sig = "Sig [Value a]: " ++ show (takeSigExhaustive sig) ++ "..."
+  show sig = "Sig [Value a]: " ++ show (takeSig 100 sig) ++ "..."
 
 instance Ord a => Ord (Value a) where
   compare v1 v2 = compare (current v1) (current v2)

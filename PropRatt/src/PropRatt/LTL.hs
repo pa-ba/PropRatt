@@ -36,7 +36,7 @@ import PropRatt.Value
 data Pred (ts :: [Type]) a where
   Tautology     :: Pred ts a
   Contradiction :: Pred ts a
-  Now           :: (a ~ Bool) => Atom ts a -> Pred ts a
+  Now           :: Atom ts Bool -> Pred ts Bool
   Not           :: Pred ts a -> Pred ts a
   And           :: Pred ts a -> Pred ts a -> Pred ts a
   Or            :: Pred ts a -> Pred ts a -> Pred ts a
@@ -52,9 +52,10 @@ data Atom (ts :: [Type]) (t :: Type) where
   Pure :: t -> Atom ts t
   Apply :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
   Index :: Lookup ts t -> Atom ts t
+  Ticked :: Lookup ts t -> Atom ts Bool
 
 data Lookup (ts :: [Type]) (t :: Type) where
-  Ticked :: Lookup ts t -> Lookup ts Bool
+  -- Ticked :: Lookup ts t -> Lookup ts Bool
   Previous :: Lookup ts t -> Lookup ts t
   Prior :: Int -> Lookup ts t -> Lookup ts t
   First :: Lookup (Value t ': x) t
@@ -72,6 +73,8 @@ instance Functor (Atom ts) where
   fmap f (Pure x)     = Pure (f x)
   fmap f (Apply g x)  = Apply (fmap (f .) g) x
   fmap f (Index lu)   = Apply (Pure f) (Index lu)
+  fmap f (Ticked lu)   = Apply (Pure f) (Ticked lu)
+
 
 instance Applicative (Atom ts) where
     pure :: a -> Atom ts a
@@ -148,6 +151,23 @@ nthPrevious n curr@(Current b history)
         _ :! xs -> nthPrevious (n - 1) (Current b xs)
         Nil     -> Nothing'
 
+extractHasTicked :: Value t -> Bool
+extractHasTicked (Current (HasTicked b) _) = b
+
+evalTicked :: Lookup ts t -> HList ts -> Bool
+evalTicked lu hls = case lu of
+  Previous lu -> error "No prev on HasTicked"
+  Prior n lu -> error "No prev on HasTicked"
+  First         -> extractHasTicked $ first hls
+  Second        -> extractHasTicked $ second hls
+  Third         -> extractHasTicked $ third hls
+  Fourth        -> extractHasTicked $ fourth hls
+  Fifth         -> extractHasTicked $ fifth hls
+  Sixth         -> extractHasTicked $ sixth hls
+  Seventh       -> extractHasTicked $ seventh hls
+  Eighth        -> extractHasTicked $ eighth hls
+  Ninth         -> extractHasTicked $ ninth hls
+
 evalAtom :: Atom ts t -> HList ts -> Atom ts t
 evalAtom (Pure x) _       = pure x
 evalAtom (Apply f x) hls  = (($) <$> evalAtom f hls) <*> evalAtom x hls
@@ -156,13 +176,10 @@ evalAtom (Index lu) hls =
     Just' (Current b (h :! t))  -> pure h
     Just' (Current b Nil)       -> error "No History. Buhu :)"
     Nothing'                    -> error "No Value, Extra buhu:)"
+evalAtom (Ticked lu) hls = pure (evalTicked lu hls)
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
 evalLookup lu hls = case lu of
-  Ticked lu       ->
-    case evalLookup lu hls of
-      Just' (Current (HasTicked b') _) -> Just' (Current (HasTicked b') (b' :! Nil))
-      Nothing' -> Nothing'
   Previous lu ->
     case evalLookup lu hls of
       Just' (Current b history) ->

@@ -23,6 +23,7 @@ import AsyncRattus.Signal hiding (mkSig)
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
 import PropRatt.Generators
+import AsyncRattus.Plugin.Annotation
 import Prelude hiding (const, filter, getLine, map, null, putStrLn, zip, zipWith)
 import PropRatt.Value
 import Data.Kind (Type)
@@ -130,6 +131,14 @@ prependAwaitFixed x xs y ys  = delay (
      Fst (x' ::: xs')   ys'         -> (Current (HasTicked True) (x' :! x) %: toFalse y) ::: prependAwait (x':!x) xs' y ys'
      Snd xs'@(Delay _ f) (y' ::: ys')           -> (Current (HasTicked False) x %: y') ::: prependAwait x (Delay (IntSet.singleton 6) f) y' ys'
      Both (x' ::: xs'@(Delay _ f)) (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y') ::: prependAwait (x':!x) (Delay (IntSet.singleton 6) f) y' ys')
+     
+{-# ANN lengthH AllowRecursion #-}
+lengthH :: HList ts -> Int -> Int
+lengthH HNil n = n
+lengthH (HCons a as) n = lengthH as (n+1)
+
+hlistLen :: Sig (HList ts) -> Int
+hlistLen (m ::: ms) = lengthH m 0
 
 prepend :: (Stable a, Stable (HList v), Falsify v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
 prepend (x ::: xs) (y ::: ys) =
@@ -168,8 +177,7 @@ triggerAwaitMaybe :: Stable b => Box (a -> b -> c) -> O (Sig a) -> Sig b -> O (S
 triggerAwaitMaybe f as (b:::bs) = delay (case select as bs of
             Fst (a' ::: as') bs' -> Just' (unbox f a' b) ::: triggerAwaitMaybe f as' (b ::: bs')
             Snd as' bs' -> Nothing' ::: triggerAwaitMaybe f as' bs'
-            Both (a' ::: as') (b' ::: bs') -> Just' (unbox f a' b') ::: triggerAwaitMaybe f as' (b' ::: bs')
-          )
+            Both (a' ::: as') (b' ::: bs') -> Just' (unbox f a' b') ::: triggerAwaitMaybe f as' (b' ::: bs'))
 
 mkNats :: (Stable a, Floating a) => Sig a
 mkNats = scan (box (\a _ -> a + 1)) (-1) (const (0))

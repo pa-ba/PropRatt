@@ -1,23 +1,12 @@
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use const" #-}
-module PropRatt.Utilities (
-    takeSig,
-    takeSigExhaustive,
-    takeSigAndClockExhaustive,
-    sizeSig,
-    pickSmallestClock,
-    isStuttering,
-    stuttering,
-    isEventuallyEqual,
-    getLater,
-    sigAEqualsSigB,
-    mkSigOne,
-    takeSigAndClock
-) where
+module PropRatt.Utilities where
 
-import AsyncRattus.Signal (Sig(..), map)
-import AsyncRattus.InternalPrimitives( O(..), InputValue(InputValue) )
+import AsyncRattus.Signal (Sig(..), map, zip, scan)
+import AsyncRattus.Strict
+import AsyncRattus.InternalPrimitives
 import qualified Data.IntSet as IntSet
 import Prelude hiding (map, zip, zipWith)
 
@@ -103,3 +92,9 @@ getLater (_ ::: xs) = xs
 
 mkSigOne :: Sig Int
 mkSigOne = 1 ::: Delay (IntSet.fromList [1]) (\_ -> mkSigOne)
+
+stutter :: (Stable a, Stable b) => Sig a -> Sig b -> Sig a
+stutter xs ys = map (box fst') (zip xs ys)
+
+monotonic :: (Stable Int) => Sig Int -> Sig Int
+monotonic xs = scan (box (+)) 0 (map (box abs) xs)

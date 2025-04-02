@@ -19,7 +19,9 @@ module PropRatt.LTL
     SafetyError,
     SafetyPred,
     (|<|),
+    (|<=|),
     (|>|),
+    (|>=|),
     (|==|),
     checkScope,
   )
@@ -101,8 +103,12 @@ instance Num t => Num (Atom ts t) where
   
 (|<|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
 x |<| y = (<) <$> x <*> y
+(|<=|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+x |<=| y = (<=) <$> x <*> y
 (|>|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
 x |>| y = (>) <$> x <*> y
+(|>=|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+x |>=| y = (>=) <$> x <*> y
 (|==|) :: (Applicative f, Eq a) => f a -> f a -> f Bool
 x |==| y = (==) <$> x <*> y
 

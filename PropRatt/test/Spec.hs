@@ -12,7 +12,7 @@ import AsyncRattus.InternalPrimitives
 import Prelude hiding (zip, map, filter)
 import AsyncRattus.Signal
 import AsyncRattus.Strict
-import PropRatt.Utilities (mkSigOne, getLater)
+import PropRatt.Utilities
 
 prop_interleave :: Property
 prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
@@ -69,12 +69,11 @@ prop_buffer = forAll (generateSignals @Int) $ \intSignals ->
         result      = evaluate predicate state
     in result
 
--- false positive, does not test anything useful since the stopped signal never ticks
 prop_stop :: Property
-prop_stop = forAll (generateSignals @Bool) $ \intSignals ->
-    let stopped     = stop (box (id)) (first intSignals)
+prop_stop = forAll (generateSignals @Int) $ \intSignals ->
+    let stopped     = stop (box (>100)) (first intSignals)
         state       = prepend stopped $ flatten intSignals
-        predicate   = Always $ (Now ((Index First) |==| (Pure True))) `Implies` (Next (Now ((Index First) |==| (Pure True))))
+        predicate   = Always $ Implies (Now ((Index First) |>| (Pure 100))) (Always $ Next (Now (Index (Previous First) |==| (Index First))))
         result      = evaluate predicate state
     in result
 
@@ -119,6 +118,45 @@ prop_map_gt = forAll (generateSignals @Int) $ \intSignal ->
         result      = evaluate predicate state
     in result
 
+prop_parallel :: Property
+prop_parallel = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+    let paralleled  = parallel (first intSignals) (second intSignals)
+        state       = prepend paralleled $ flatten intSignals
+        predicate   = Always $ 
+            Implies (Now (Ticked Third)) (Now (Ticked First))
+            `And`
+            Implies (Now (Ticked Second)) (Now (Ticked First))
+        result      = evaluate predicate state
+    in result
+
+prop_is_stuttering :: Property
+prop_is_stuttering = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+    let stuttered  = stutter (first intSignals) (second intSignals)
+        state       = prepend stuttered $ flatten intSignals
+        predicate   = Always $ 
+            Implies (Now (Ticked First)) (Now (Index First |==| Index Second))
+            `And`
+            Next (Implies (And (Now (Ticked Third)) (Not (Now (Ticked Second)))) (Now (Index (Previous First) |==| Index First)))
+        result      = evaluate predicate state
+    in result
+
+prop_is_monotonic :: Property
+prop_is_monotonic = forAll (generateSignals @Int) $ \intSignals ->
+    let mono        = monotonic (first intSignals)
+        state       = prepend mono $ flatten intSignals
+        predicate   = Always $ Next (Now ((Index First) |>=| (Index (Previous First))))
+        result      = evaluate predicate state
+    in result
+
+prop_is_prepend :: Property
+prop_is_prepend = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+    let flat        = flatten intSignals
+        before      = hlistLen flat
+        state       = prepend (first intSignals) $ flatten intSignals
+        after       = hlistLen state
+        result      = (before + 1) == after
+    in result
+
 main :: IO ()
 main = do
     quickCheck prop_interleave
@@ -132,3 +170,7 @@ main = do
     quickCheck prop_ticked
     quickCheck prop_trigger_maybe
     quickCheck prop_map_gt
+    quickCheck prop_parallel
+    quickCheck prop_is_stuttering
+    quickCheck prop_is_monotonic
+    quickCheck prop_is_prepend

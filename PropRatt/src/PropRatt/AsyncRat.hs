@@ -170,3 +170,16 @@ triggerAwaitMaybe f as (b:::bs) = delay (case select as bs of
             Snd as' bs' -> Nothing' ::: triggerAwaitMaybe f as' bs'
             Both (a' ::: as') (b' ::: bs') -> Just' (unbox f a' b') ::: triggerAwaitMaybe f as' (b' ::: bs')
           )
+
+mkNats :: (Stable a, Floating a) => Sig a
+mkNats = scan (box (\a _ -> a + 1)) (-1) (const (0))
+
+saturatingGrowth :: Floating a => a -> a -> a -> a
+saturatingGrowth y_min y_max x =
+  y_min + (y_max - y_min) * (1 - exp (-x*0.1))
+
+growth :: Floating a => a -> a
+growth x = saturatingGrowth 0 100 x
+
+makeGrowthSig :: Floating a => Sig a -> Sig a
+makeGrowthSig (x ::: xs) = growth x ::: delay (makeGrowthSig (adv xs))

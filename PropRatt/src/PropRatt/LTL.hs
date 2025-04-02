@@ -217,7 +217,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
     advanceMax = f (InputValue (greatest cl) ())
 
 evaluate :: (Ord a) => Pred ts a -> Sig (HList ts) -> Bool
-evaluate = evaluate' 20
+evaluate = evaluate' 200
 
 -------------------------------
 

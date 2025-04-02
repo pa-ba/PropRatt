@@ -14,7 +14,7 @@ import Test.QuickCheck (generate)
 import AsyncRattus (box, unbox)
 import AsyncRattus.Signal (filter, Sig ((:::)))
 import PropRatt.LTL
-import PropRatt.Utilities (takeSig, takeSigAndClock)
+import PropRatt.Utilities 
 import AsyncRattus.Channels (setOutput, startEventLoop, Producer (getCurrent, getNext), getNext, getCurrent)
 import System.Exit (exitSuccess)
 import AsyncRattus.Strict
@@ -24,6 +24,7 @@ import PropRatt.Value (Value)
 main :: IO ()
 main = do
     print "hej"
-    --print $ takeSigAndClock 20 (signalsUnderTest)
-    --print intSignals
-    --print (evaluate (Always (Next (Now ((Index First) |<| (Pure 100000))))) signalsUnderTest) 
+    let gSig  = makeGrowthSig mkNats
+    let state = (prepend gSig $ flatten (HCons gSig HNil)) :: Sig (HList [Value Float, Value Float])
+    print state
+

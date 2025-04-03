@@ -9,7 +9,7 @@ import PropRatt.Generators
 import PropRatt.Value
 import PropRatt.AsyncRat
 import AsyncRattus.InternalPrimitives
-import Prelude hiding (zip, map, filter)
+import Prelude hiding (zip, map, filter, const)
 import AsyncRattus.Signal
 import AsyncRattus.Strict
 import PropRatt.Utilities
@@ -183,7 +183,40 @@ prop_is_prepend = forAll (generateSignals @[Int, Int]) $ \intSignals ->
         result      = (before + 1) == after
     in result
 
--- 
+-- ZS =  signal
+-- YS = arbitrary
+-- ZS == YS `Until` (HasTicked ys AND (Implies (Next (Always (Not (HasTicked ys)))) (Index (Previous ZS)) |==| (Index ZS))) AND (NOT (ZS |==| Previous (Index ZS)))
+
+prop_switch_r :: Property
+prop_switch_r = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+    let xs                  = first intSignals 
+        (_ ::: laterSig)    = second intSignals
+        ys                  = (mapAwait (box (\_ -> const)) laterSig) :: O (Sig (Int -> Sig Int)) 
+        zs                  = switchR xs ys
+        preState            = prependLater laterSig $ flatten intSignals 
+        state               = prepend zs preState
+        predicate           = (
+            Next (Now ((Index First) |==| (Index Second)))) `Until` (
+                Now ((Ticked Second) |==| (Pure True))
+                `And` 
+                Next (Next ((Implies 
+                    (Always (Not (Now ((Ticked Second) |==| (Pure True)))))
+                    (Now (Index (Previous First) |==| (Index First)) 
+                        `And` 
+                        (Not (Now ((Index First) |==| Index (Previous First)))))))))
+        result              = evaluate predicate state
+    in result
+
+
+    --  Now ((Index First) |==| (Index Second))) 
+            -- `Until` (
+            --     Now ((Ticked Second) |==| (Pure True))
+            --     `And` 
+            --     (Implies 
+            --         (Next (Always (Not (Now ((Ticked Second) |==| (Pure True)))))) 
+            --         (Now (Index (Previous First) |==| (Index First)) 
+            --             `And` 
+            --             (Not (Now ((Index First) |==| Index (Previous First)))))))
 
 main :: IO ()
 main = do
@@ -203,3 +236,4 @@ main = do
     quickCheck prop_is_stuttering
     quickCheck prop_is_monotonic
     quickCheck prop_is_prepend
+    quickCheck prop_switch_r

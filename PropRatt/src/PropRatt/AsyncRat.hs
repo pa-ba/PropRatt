@@ -72,7 +72,6 @@ instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
 class Stable (HList v) => Flatten s v | s -> v, v -> s where
   flatten :: HList s -> Sig (HList v)
 
--- todo define this in a way that doesnt need the overlapping pragma
 instance {-# OVERLAPPING #-} (Stable a, Stable (Value a)) => Flatten '[Sig a] '[Value a] where
   flatten (HCons h HNil) = singleton' h
 

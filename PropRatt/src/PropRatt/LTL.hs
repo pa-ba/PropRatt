@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# LANGUAGE GADTs, DataKinds, MultiParamTypeClasses, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -35,54 +34,53 @@ import PropRatt.AsyncRat
 import Data.Kind
 import PropRatt.Value
 
-data Pred (ts :: [Type]) a where
-  Tautology     :: Pred ts a
-  Contradiction :: Pred ts a
+data Pred (ts :: [Type]) (t :: Type) where
+  Tautology     :: Pred ts t
+  Contradiction :: Pred ts t
   Now           :: Atom ts Bool -> Pred ts Bool
-  Not           :: Pred ts a -> Pred ts a
-  And           :: Pred ts a -> Pred ts a -> Pred ts a
-  Or            :: Pred ts a -> Pred ts a -> Pred ts a
-  Until         :: Pred ts a -> Pred ts a -> Pred ts a
-  Next          :: Pred ts a -> Pred ts a
-  Implies       :: Pred ts a -> Pred ts a -> Pred ts a
-  Always        :: Pred ts a -> Pred ts a
-  Eventually    :: Pred ts a -> Pred ts a
-  After         :: Int -> Pred ts a -> Pred ts a
-  Release       :: Pred ts a -> Pred ts a -> Pred ts a
-  TickConst     :: Pred ts a -> Pred ts a
+  Not           :: Pred ts t -> Pred ts t
+  And           :: Pred ts t -> Pred ts t -> Pred ts t
+  Or            :: Pred ts t -> Pred ts t -> Pred ts t
+  Until         :: Pred ts t -> Pred ts t -> Pred ts t
+  Next          :: Pred ts t -> Pred ts t
+  Implies       :: Pred ts t -> Pred ts t -> Pred ts t
+  Always        :: Pred ts t -> Pred ts t
+  Eventually    :: Pred ts t -> Pred ts t
+  After         :: Int -> Pred ts t -> Pred ts t
+  Release       :: Pred ts t -> Pred ts t -> Pred ts t
+  TickConst     :: Pred ts t -> Pred ts t
+  ImpliesSig    :: Sig t -> (a -> Bool) -> Pred ts t -> Pred ts t
 
 data Atom (ts :: [Type]) (t :: Type) where
-  Pure :: t -> Atom ts t
-  Apply :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
-  Index :: Lookup ts t -> Atom ts t
-  Ticked :: Lookup ts t -> Atom ts Bool
+  Pure    :: t -> Atom ts t
+  Apply   :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
+  Index   :: Lookup ts t -> Atom ts t
+  Ticked  :: Lookup ts t -> Atom ts Bool
 
 data Lookup (ts :: [Type]) (t :: Type) where
-  -- Ticked :: Lookup ts t -> Lookup ts Bool
-  Previous :: Lookup ts t -> Lookup ts t
-  Prior :: Int -> Lookup ts t -> Lookup ts t
-  First :: Lookup (Value t ': x) t
-  Second :: Lookup (x1 ': Value t ': x2) t
-  Third :: Lookup (x1 ': x2 ': Value t ': x3) t
-  Fourth :: Lookup (x1 ': x2 ': x3 ': Value t ': x4) t
-  Fifth :: Lookup (x1 ': x2 ': x3 ': x4 ': Value t ': x5) t
-  Sixth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': Value t ': x6) t
-  Seventh :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': Value t ': x7) t
-  Eighth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value t ': x8) t
-  Ninth :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value t ': x9) t
+  Previous  :: Lookup ts t -> Lookup ts t
+  Prior     :: Int -> Lookup ts t -> Lookup ts t
+  First     :: Lookup (Value t ': x) t
+  Second    :: Lookup (x1 ': Value t ': x2) t
+  Third     :: Lookup (x1 ': x2 ': Value t ': x3) t
+  Fourth    :: Lookup (x1 ': x2 ': x3 ': Value t ': x4) t
+  Fifth     :: Lookup (x1 ': x2 ': x3 ': x4 ': Value t ': x5) t
+  Sixth     :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': Value t ': x6) t
+  Seventh   :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': Value t ': x7) t
+  Eighth    :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value t ': x8) t
+  Ninth     :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value t ': x9) t
 
 instance Functor (Atom ts) where
-  fmap :: (a -> b) -> Atom ts a -> Atom ts b
+  fmap :: (t -> r) -> Atom ts t -> Atom ts r
   fmap f (Pure x)     = Pure (f x)
   fmap f (Apply g x)  = Apply (fmap (f .) g) x
   fmap f (Index lu)   = Apply (Pure f) (Index lu)
-  fmap f (Ticked lu)   = Apply (Pure f) (Ticked lu)
-
+  fmap f (Ticked lu)  = Apply (Pure f) (Ticked lu)
 
 instance Applicative (Atom ts) where
-    pure :: a -> Atom ts a
+    pure :: t -> Atom ts t
     pure = Pure
-    (<*>) :: Atom ts (a -> b) -> Atom ts a -> Atom ts b
+    (<*>) :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
     Pure f <*> x = fmap f x              
     Apply f g <*> x = Apply (Apply f g) x
 
@@ -102,53 +100,58 @@ instance Num t => Num (Atom ts t) where
   fromInteger :: Integer -> Atom ts t
   fromInteger n = pure (fromInteger n)
   
-(|<|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+(|<|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
 x |<| y = (<) <$> x <*> y
-(|<=|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+(|<=|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
 x |<=| y = (<=) <$> x <*> y
-(|>|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+(|>|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
 x |>| y = (>) <$> x <*> y
-(|>=|) :: (Applicative f, Ord a) => f a -> f a -> f Bool
+(|>=|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
 x |>=| y = (>=) <$> x <*> y
-(|==|) :: (Applicative f, Eq a) => f a -> f a -> f Bool
+(|==|) :: (Applicative f, Eq t) => f t -> f t -> f Bool
 x |==| y = (==) <$> x <*> y
 
+-- | Checks whether the instances of "previous" is within scope of t "next" operator.
+-- This prevents the evaluation from looking too far back in time.
 checkScope :: Pred ts t -> Bool
 checkScope p = checkPred p 0
 
+-- | Traverses the predicate supplied and exits early if it finds t subtree where the scope is negative.
+-- The scope is incremented for each next constructor, and decremented for each previous or prior constructor.
 checkPred :: Pred ts t -> Int -> Bool
-checkPred predicate steps =
-  steps >= 0 &&
+checkPred predicate scope =
+  valid scope && 
   case predicate of
-    Tautology       -> valid steps
-    Contradiction   -> valid steps
-    Now atom        -> valid (checkAtom atom steps)
-    Not p           -> checkPred p steps
-    And p1 p2       -> checkPred p1 steps && checkPred p2 steps
-    Or p1 p2        -> checkPred p1 steps || checkPred p2 steps
-    Until p1 p2     -> checkPred p1 steps && checkPred p2 steps
-    Next p          -> checkPred p (steps + 1)
-    Implies p1 p2   -> checkPred p1 steps && checkPred p2 steps
-    Release p1 p2   -> checkPred p1 steps && checkPred p2 steps
-    Always p        -> checkPred p steps
-    Eventually p    -> checkPred p steps
-    After _ p       -> checkPred p steps
+    Tautology       -> valid scope
+    Contradiction   -> valid scope
+    Now atom        -> valid (checkAtom atom scope)
+    Not p           -> checkPred p scope
+    And p1 p2       -> checkPred p1 scope && checkPred p2 scope
+    Or p1 p2        -> checkPred p1 scope || checkPred p2 scope
+    Until p1 p2     -> checkPred p1 scope && checkPred p2 scope
+    Next p          -> checkPred p (scope + 1)
+    Implies p1 p2   -> checkPred p1 scope && checkPred p2 scope
+    Release p1 p2   -> checkPred p1 scope && checkPred p2 scope
+    Always p        -> checkPred p scope
+    Eventually p    -> checkPred p scope
+    After _ p       -> checkPred p scope
   where
     valid s = s >= 0
 
+-- | Propegates the smallest scope found by traversing the atom.
 checkAtom :: Atom ts t -> Int -> Int
-checkAtom atom steps =
+checkAtom atom scope =
   case atom of
-    Pure _        -> steps
-    Apply fun arg -> min (checkAtom fun steps) (checkAtom arg steps)
-    Index lookup  -> checkLookup lookup steps
+    Pure _        -> scope
+    Apply fun arg -> min (checkAtom fun scope) (checkAtom arg scope)
+    Index lookup  -> checkLookup lookup scope
 
 checkLookup :: Lookup ts t -> Int -> Int
-checkLookup lookup steps =
+checkLookup lookup scope =
   case lookup of
-    Previous lookup'  -> checkLookup lookup' (steps - 1)
-    Prior n lookup'   -> checkLookup lookup' (steps - n)
-    _                 -> steps
+    Previous lookup'  -> checkLookup lookup' (scope - 1)
+    Prior n lookup'   -> checkLookup lookup' (scope - n)
+    _                 -> scope
 
 nthPrevious :: Int -> Value t -> Maybe' (Value t)
 nthPrevious n curr@(Current b history)
@@ -158,31 +161,31 @@ nthPrevious n curr@(Current b history)
         _ :! xs -> nthPrevious (n - 1) (Current b xs)
         Nil     -> Nothing'
 
-extractHasTicked :: Value t -> Bool
-extractHasTicked (Current (HasTicked b) _) = b
-
 evalTicked :: Lookup ts t -> HList ts -> Bool
 evalTicked lu hls = case lu of
-  Previous lu -> error "No prev on HasTicked"
-  Prior n lu -> error "No prev on HasTicked"
-  First         -> extractHasTicked $ first hls
-  Second        -> extractHasTicked $ second hls
-  Third         -> extractHasTicked $ third hls
-  Fourth        -> extractHasTicked $ fourth hls
-  Fifth         -> extractHasTicked $ fifth hls
-  Sixth         -> extractHasTicked $ sixth hls
-  Seventh       -> extractHasTicked $ seventh hls
-  Eighth        -> extractHasTicked $ eighth hls
-  Ninth         -> extractHasTicked $ ninth hls
+  Previous _ -> errorTickedPast
+  Prior _ _  -> errorTickedPast
+  First      -> extract $ first hls
+  Second     -> extract $ second hls
+  Third      -> extract $ third hls
+  Fourth     -> extract $ fourth hls
+  Fifth      -> extract $ fifth hls
+  Sixth      -> extract $ sixth hls
+  Seventh    -> extract $ seventh hls
+  Eighth     -> extract $ eighth hls
+  Ninth      -> extract $ ninth hls
+  where
+    errorTickedPast                   = error "Cannot check if t signal has ticked in the past."
+    extract (Current (HasTicked b) _) = b
 
 evalAtom :: Atom ts t -> HList ts -> Atom ts t
-evalAtom (Pure x) _       = pure x
-evalAtom (Apply f x) hls  = (($) <$> evalAtom f hls) <*> evalAtom x hls
-evalAtom (Index lu) hls =
+evalAtom (Pure x) _      = pure x
+evalAtom (Apply f x) hls = (($) <$> evalAtom f hls) <*> evalAtom x hls
+evalAtom (Index lu) hls  =
   case evalLookup lu hls of
-    Just' (Current b (h :! t))  -> pure h
-    Just' (Current b Nil)       -> error "No History. Buhu :)"
-    Nothing'                    -> error "No Value, Extra buhu:)"
+    Just' (Current _ (h :! _)) -> pure h
+    Just' (Current _ Nil)      -> error "History not found for signal."
+    Nothing'                   -> error "Signal not found."
 evalAtom (Ticked lu) hls = pure (evalTicked lu hls)
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
@@ -195,7 +198,7 @@ evalLookup lu hls = case lu of
           Nil     -> Nothing'
       Nothing' -> Nothing'
   Prior n lu -> case evalLookup lu hls of
-    Just' v -> nthPrevious n v
+    Just' v  -> nthPrevious n v
     Nothing' -> Nothing'
   First         -> Just' (first hls)
   Second        -> Just' (second hls)
@@ -207,16 +210,15 @@ evalLookup lu hls = case lu of
   Eighth        -> Just' (eighth hls)
   Ninth         -> Just' (ninth hls)
 
-evaluate' :: (Ord a) => Int -> Pred ts a -> Sig (HList ts) -> Bool
-evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
-  timestepsLeft <= 0 || case formulae of
+evaluate' :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
+evaluate' timescopeLeft formulae sig@(x ::: Delay cl f) =
+  timescopeLeft <= 0 || case formulae of
         Tautology       -> True
         Contradiction   -> False
-        Now atom        ->
-          let m = evalAtom atom x
-          in case m of
+        Now atom        -> 
+          case evalAtom atom x of
             Pure b -> b
-            _ -> error "hej123"
+            _ -> error "Unexpected error during evaluation" -- unreachable
         Not phi         -> not (eval phi sig)
         And phi psi     -> eval phi sig && eval psi sig
         Or phi psi      -> eval phi sig || eval psi sig
@@ -226,25 +228,25 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
         Implies phi psi -> not (eval phi sig && not (eval psi sig))
         Always phi      -> eval phi sig && evaluateNext (Always phi) advance
         Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
-                            && not (timestepsLeft == 1 && not (eval phi sig))
+                            && not (timescopeLeft == 1 && not (eval phi sig))
         Release phi psi -> (eval psi sig && eval phi sig)
                             || (eval psi sig && evaluateNext (phi `Until` psi) advance)
         After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
         TickConst phi   -> evaluateNext phi advanceMax
   where
-    evaluateNext = evaluate' (timestepsLeft - 1)
-    eval = evaluate' timestepsLeft
+    evaluateNext = evaluate' (timescopeLeft - 1)
+    eval = evaluate' timescopeLeft
     smallest = IntSet.findMin
     greatest = IntSet.findMax
     advance = f (InputValue (smallest cl) ())
     advanceMax = f (InputValue (greatest cl) ())
 
-evaluate :: (Ord a) => Pred ts a -> Sig (HList ts) -> Bool
+evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
 evaluate = evaluate' 200
 
 -------------------------------
 
-isSafetyPredicate :: Pred ts a -> Bool
+isSafetyPredicate :: Pred ts t -> Bool
 isSafetyPredicate Tautology       = True
 isSafetyPredicate Contradiction   = True
 isSafetyPredicate (Now _)         = True
@@ -259,39 +261,39 @@ isSafetyPredicate (Always _ )     = False
 isSafetyPredicate (Eventually _ ) = False
 isSafetyPredicate (Release _ _)   = False
 
-type SafetyPred ts a = Either SafetyError (Pred ts a)
+type SafetyPred ts t = Either SafetyError (Pred ts t)
 
 newtype SafetyError = SafetyError String
 
-mkSafePred :: Pred ts a -> SafetyPred ts a
+mkSafePred :: Pred ts t -> SafetyPred ts t
 mkSafePred p
   | isSafetyPredicate p = Right p
-  | otherwise = Left $ SafetyError "Predicate is a safety property."
+  | otherwise = Left $ SafetyError "Predicate is t safety property."
 
-mkBinaryOp :: (Pred ts a -> Pred ts a -> Pred ts a) -> Pred ts a -> Pred ts a -> SafetyPred ts a
+mkBinaryOp :: (Pred ts t -> Pred ts t -> Pred ts t) -> Pred ts t -> Pred ts t -> SafetyPred ts t
 mkBinaryOp op p q = do
   p' <- mkSafePred p
   q' <- mkSafePred q
   return (op p' q')
 
-mkAnd, mkOr, mkImplies :: Pred ts a -> Pred ts a -> SafetyPred ts a
+mkAnd, mkOr, mkImplies :: Pred ts t -> Pred ts t -> SafetyPred ts t
 mkAnd = mkBinaryOp And
 mkOr = mkBinaryOp Or
 mkImplies = mkBinaryOp Implies
 
-mkUnaryOp :: (Pred ts a -> Pred ts a) -> Pred ts a -> SafetyPred ts a
+mkUnaryOp :: (Pred ts t -> Pred ts t) -> Pred ts t -> SafetyPred ts t
 mkUnaryOp op = mkSafePred . op
 
-mkNext, mkNow, mkTautology, mkContradiction :: Pred ts a -> SafetyPred ts a
+mkNext, mkNow, mkTautology, mkContradiction :: Pred ts t -> SafetyPred ts t
 mkNext = mkUnaryOp id
 mkNow = mkUnaryOp id
 mkTautology = mkUnaryOp id
 mkContradiction = mkUnaryOp id
 
-mkLivenessOp :: String -> Pred ts a -> SafetyPred ts a
-mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in a safety property.")
+mkLivenessOp :: String -> Pred ts t -> SafetyPred ts t
+mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in t safety property.")
 
-mkAlways, mkUntil, mkEventually, mkRelease :: Pred ts a -> SafetyPred ts a
+mkAlways, mkUntil, mkEventually, mkRelease :: Pred ts t -> SafetyPred ts t
 mkAlways = mkLivenessOp "Always"
 mkUntil = mkLivenessOp "Until"
 mkEventually = mkLivenessOp "Eventually"

@@ -133,7 +133,6 @@ prop_map_gt = forAll (generateSignals @Int) $ \intSignal ->
         result      = evaluate predicate state
     in result
 
-
 prop_range :: Bool
 prop_range = 
     let gSig  = makeGrowthSig mkNats
@@ -183,6 +182,8 @@ prop_is_prepend = forAll (generateSignals @[Int, Int]) $ \intSignals ->
         after       = hlistLen state
         result      = (before + 1) == after
     in result
+
+-- 
 
 main :: IO ()
 main = do

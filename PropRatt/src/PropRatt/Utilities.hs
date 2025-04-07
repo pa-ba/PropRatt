@@ -13,6 +13,8 @@ import Prelude hiding (map, zip, zipWith)
 pickSmallestClock :: IntSet.IntSet -> Int
 pickSmallestClock = IntSet.findMin
 
+
+
 takeSig :: Int -> Sig a -> [a]
 takeSig 0 _ = []
 takeSig n (x ::: Delay _ f) = x : takeSig (n-1) (f (InputValue 0 ()))
@@ -32,10 +34,10 @@ takeSigAndClock n (x ::: Delay cl f) = case n of
     0 -> [(x, cl)]
     _ -> (x, cl) : takeSigAndClock (n-1) (f (InputValue (pickSmallestClock cl) ()))
 
-sizeSig :: Sig a -> Int -> Int
-sizeSig (_ ::: Delay cl f) acc
+lengthSig :: Sig a -> Int -> Int
+lengthSig (_ ::: Delay cl f) acc
     | IntSet.null cl = acc
-    | otherwise = sizeSig (f (InputValue 0 ())) (acc+1)
+    | otherwise = lengthSig (f (InputValue 0 ())) (acc+1)
 
 isStuttering :: Sig Int -> Sig Int -> Bool
 isStuttering (x ::: Delay clx fx) (y ::: Delay cly fy)

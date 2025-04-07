@@ -116,6 +116,7 @@ eighth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h8 
 ninth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
 ninth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h9 _))))))))) = h9
 
+-- obs TODO ikke særligt brugervenligt
 prependLater :: (Stable a, Stable (HList v), Falsify v) => O (Sig a) -> Sig (HList v) -> Sig (HList (Value a ': v))
 prependLater xs (y ::: ys) =
   HCons (Current (HasTicked False) Nil) y ::: prependAwait Nil xs y ys

@@ -48,8 +48,6 @@ data Pred (ts :: [Type]) (t :: Type) where
   Eventually    :: Pred ts t -> Pred ts t
   After         :: Int -> Pred ts t -> Pred ts t
   Release       :: Pred ts t -> Pred ts t -> Pred ts t
-  TickConst     :: Pred ts t -> Pred ts t
-  ImpliesSig    :: Sig t -> (a -> Bool) -> Pred ts t -> Pred ts t
 
 data Atom (ts :: [Type]) (t :: Type) where
   Pure    :: t -> Atom ts t
@@ -211,8 +209,8 @@ evalLookup lu hls = case lu of
   Ninth         -> Just' (ninth hls)
 
 evaluate' :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
-evaluate' timescopeLeft formulae sig@(x ::: Delay cl f) =
-  timescopeLeft <= 0 || case formulae of
+evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
+  timestepsLeft <= 0 || case formulae of
         Tautology       -> True
         Contradiction   -> False
         Now atom        -> 
@@ -228,21 +226,18 @@ evaluate' timescopeLeft formulae sig@(x ::: Delay cl f) =
         Implies phi psi -> not (eval phi sig && not (eval psi sig))
         Always phi      -> eval phi sig && evaluateNext (Always phi) advance
         Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
-                            && not (timescopeLeft == 1 && not (eval phi sig))
+                            && not (timestepsLeft == 1 && not (eval phi sig))
         Release phi psi -> (eval psi sig && eval phi sig)
                             || (eval psi sig && evaluateNext (phi `Until` psi) advance)
         After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
-        TickConst phi   -> evaluateNext phi advanceMax
   where
-    evaluateNext = evaluate' (timescopeLeft - 1)
-    eval = evaluate' timescopeLeft
+    evaluateNext = evaluate' (timestepsLeft - 1)
+    eval = evaluate' timestepsLeft
     smallest = IntSet.findMin
-    greatest = IntSet.findMax
     advance = f (InputValue (smallest cl) ())
-    advanceMax = f (InputValue (greatest cl) ())
 
 evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
-evaluate = evaluate' 200
+evaluate = evaluate' 50
 
 -------------------------------
 

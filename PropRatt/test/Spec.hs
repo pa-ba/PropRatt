@@ -2,6 +2,9 @@
 {-# LANGUAGE TypeApplications, FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
 {-# HLINT ignore "Redundant bracket" #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Move brackets to avoid $" #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 import Test.QuickCheck
 import PropRatt.LTL
@@ -13,6 +16,7 @@ import Prelude hiding (zip, map, filter, const)
 import AsyncRattus.Signal
 import AsyncRattus.Strict
 import PropRatt.Utilities
+import Data.IntSet as IntSet hiding (map)
 
 instance Stable (Sig Int) where
 
@@ -32,7 +36,7 @@ prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
 -- Jump property (value is either equal to the original signal or equal to 10 (which is the number of the signal of the dummy function))
 prop_jump :: Property
 prop_jump = forAll (generateSignals @Int) $ \intSignals ->
-   let  jumpFunc    = box (\n -> if n > 10 then Just' mkSigOne else Nothing')
+   let  jumpFunc    = box (\n -> if n > 10 then Just' (const 1) else Nothing')
         jumpSig     = jump jumpFunc (first intSignals)
         state       = prepend jumpSig $ flatten intSignals
         predicate   = Always $
@@ -41,22 +45,6 @@ prop_jump = forAll (generateSignals @Int) $ \intSignals ->
                         Now ((Index First) |==| (Pure 1))
         result      = evaluate predicate state
     in result
-
--- prop_jump2 :: (Stable ts, Stable s, s ~ Sig Int, ts ~ HList '[s, s]) => Property
--- prop_jump2 = forAll (generateSignals @[Int, Int]) $ \intSignals ->
---    let  jumpFunc    = box (\n -> if n > 10 then Just' (second (intSignals)) else Nothing')
---         jumpSig     = jump jumpFunc (first intSignals)
---         -- 1 jumpSig
---         -- 2 const
---         -- 3 first intsig
---         -- 4 const med tick
---         state       = prepend jumpSig $ prependFixed (second intSignals) $ flatten intSignals
---         predicate   = Always $ Implies (Now (Index Third |>| (Pure 10))) (Always (TickConst (Now ((Index First) |==| (Index Second)))))
---         result      = evaluate predicate state
---     in result
-
--- prefix sum are monotonically increasing
--- only holds for nat numbers.. do we need another gen sig?
 
 prop_scan :: Property
 prop_scan =  forAll (generateSignals @Int) $ \intSignals ->
@@ -134,7 +122,7 @@ prop_map_gt = forAll (generateSignals @Int) $ \intSignal ->
     in result
 
 prop_range :: Bool
-prop_range = 
+prop_range =
     let gSig  = makeGrowthSig mkNats
         state = flatten (HCons gSig HNil)
         pred0 = Now ((Index First) |==| (Pure (0.0 :: Float)))
@@ -148,34 +136,34 @@ prop_parallel :: Property
 prop_parallel = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let paralleled  = parallel (first intSignals) (second intSignals)
         state       = prepend paralleled $ flatten intSignals
-        predicate   = Always $ 
+        predicate   = Always $
             Implies (Now (Ticked Third)) (Now (Ticked First))
             `And`
             Implies (Now (Ticked Second)) (Now (Ticked First))
         result      = evaluate predicate state
     in result
 
-prop_is_stuttering :: Property
-prop_is_stuttering = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+prop_isStuttering :: Property
+prop_isStuttering = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let stuttered  = stutter (first intSignals) (second intSignals)
         state       = prepend stuttered $ flatten intSignals
-        predicate   = Always $ 
+        predicate   = Always $
             Implies (Now (Ticked First)) (Now (Index First |==| Index Second))
             `And`
             Next (Implies (And (Now (Ticked Third)) (Not (Now (Ticked Second)))) (Now (Index (Previous First) |==| Index First)))
         result      = evaluate predicate state
     in result
 
-prop_is_monotonic :: Property
-prop_is_monotonic = forAll (generateSignals @Int) $ \intSignals ->
+prop_functionIsMonotonic :: Property
+prop_functionIsMonotonic = forAll (generateSignals @Int) $ \intSignals ->
     let mono        = monotonic (first intSignals)
         state       = prepend mono $ flatten intSignals
         predicate   = Always $ Next (Now ((Index First) |>=| (Index (Previous First))))
         result      = evaluate predicate state
     in result
 
-prop_is_prepend :: Property
-prop_is_prepend = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+prop_shouldAddToHList :: Property
+prop_shouldAddToHList = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let flat        = flatten intSignals
         before      = hlistLen flat
         state       = prepend (first intSignals) $ flatten intSignals
@@ -183,40 +171,60 @@ prop_is_prepend = forAll (generateSignals @[Int, Int]) $ \intSignals ->
         result      = (before + 1) == after
     in result
 
--- ZS =  signal
--- YS = arbitrary
--- ZS == YS `Until` (HasTicked ys AND (Implies (Next (Always (Not (HasTicked ys)))) (Index (Previous ZS)) |==| (Index ZS))) AND (NOT (ZS |==| Previous (Index ZS)))
+prop_singleSignalAlwaysTicks :: Property
+prop_singleSignalAlwaysTicks = forAll (generateSignals @Int) $ \intSignal ->
+    let state       = flatten intSignal
+        predicate   = Always $ Now ((Ticked First) |==| (Pure True))
+        result      = evaluate predicate state
+    in result
 
-prop_switch_r :: Property
-prop_switch_r = forAll (generateSignals @[Int, Int]) $ \intSignals ->
-    let xs                  = first intSignals 
-        (_ ::: laterSig)    = second intSignals
-        ys                  = (mapAwait (box (\_ -> const)) laterSig) :: O (Sig (Int -> Sig Int)) 
-        zs                  = switchR xs ys
-        preState            = prependLater laterSig $ flatten intSignals 
-        state               = prepend zs preState
-        predicate           = (
-            Next (Now ((Index First) |==| (Index Second)))) `Until` (
-                Now ((Ticked Second) |==| (Pure True))
-                `And` 
-                Next (Next ((Implies 
-                    (Always (Not (Now ((Ticked Second) |==| (Pure True)))))
-                    (Now (Index (Previous First) |==| (Index First)) 
-                        `And` 
-                        (Not (Now ((Index First) |==| Index (Previous First)))))))))
+-- Switched signal equals XS until YS has ticked, from then on the value is constant assuming ys has not produced another const signal
+prop_switchR :: Property
+prop_switchR = forAll (generateSignals @Int) $ \intSignals ->
+    let xs                  = first intSignals
+        (_ ::: ys)          = scan (box (+)) 1 (const (0 :: Int))
+        zs                  = switchR xs (mapAwait (box (\_ -> const)) ys)
+        state               = prepend zs $ prependLater ys $ flatten intSignals
+        predicate           =   (Now ((Index First) |==| (Index Third)))
+                                `Until`
+                                ((Now ((Ticked Second) |==| (Pure True)))
+                                `And`
+                                (Next $ Implies
+                                    (Always $ Now ((Ticked Second) |==| (Pure False)))
+                                    (Now ((Index (Previous First)) |==| (Index First)))
+                                    `And`
+                                    (Not $ Now ((Index First) |==| (Index (Previous First)))) -- should be const
+                                    ))
         result              = evaluate predicate state
     in result
 
+-- limitation: cannot make property for switchS as it requires a later function with we cant prepend
+-- prop_switchS :: Property
+-- prop_switchS = forAll (generateSignals @Int) $ \intSignals ->
+--     let xs                  = first intSignals
+--         (_ ::: ys)          = scan (box (+)) 1 (const (0 :: Int))
+--         zs                  = switchS xs (Delay (IntSet.singleton 2) (\ _ _ -> const 100))
+--         state               = prepend zs $ prependLater ys $ flatten intSignals
+--         predicate           =   (Now ((Index First) |==| (Index Third)))
+--                                 `Until`
+--                                 ((Now ((Ticked Second) |==| (Pure True)))
+--                                 `And`
+--                                 (Next $ Implies
+--                                     (Always $ Now ((Ticked Second) |==| (Pure False)))
+--                                     (Now ((Index First) |==| (Pure 100)))
+--                                     `And`
+--                                     (Not $ Now ((Index First) |==| (Index (Previous First)))) -- should be const
+--                                     ))
+--         result              = evaluate predicate state
+--     in result
 
-    --  Now ((Index First) |==| (Index Second))) 
-            -- `Until` (
-            --     Now ((Ticked Second) |==| (Pure True))
-            --     `And` 
-            --     (Implies 
-            --         (Next (Always (Not (Now ((Ticked Second) |==| (Pure True)))))) 
-            --         (Now (Index (Previous First) |==| (Index First)) 
-            --             `And` 
-            --             (Not (Now ((Index First) |==| Index (Previous First)))))))
+prop_sigLength :: Property
+prop_sigLength = forAll ((arbitrarySig 100) :: Gen (Sig Int)) $ \(sig :: Sig Int) ->
+        let     state   = flatten (sig %: HNil)
+                pred    = Always $ Now ((Ticked First) |==| (Pure False))
+                res     = evaluate pred state 
+        in res
+
 
 main :: IO ()
 main = do
@@ -233,7 +241,9 @@ main = do
     quickCheck prop_map_gt
     quickCheck prop_range
     quickCheck prop_parallel
-    quickCheck prop_is_stuttering
-    quickCheck prop_is_monotonic
-    quickCheck prop_is_prepend
-    quickCheck prop_switch_r
+    quickCheck prop_isStuttering
+    quickCheck prop_functionIsMonotonic
+    quickCheck prop_shouldAddToHList
+    quickCheck prop_switchR
+    quickCheck prop_singleSignalAlwaysTicks
+    quickCheck prop_sigLength

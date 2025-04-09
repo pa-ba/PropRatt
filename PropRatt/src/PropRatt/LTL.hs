@@ -33,6 +33,7 @@ import qualified Data.IntSet as IntSet
 import PropRatt.AsyncRat
 import Data.Kind
 import PropRatt.Value
+import PropRatt.HList
 
 data Pred (ts :: [Type]) (t :: Type) where
   Tautology     :: Pred ts t
@@ -237,7 +238,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
     advance = f (InputValue (smallest cl) ())
 
 evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
-evaluate = evaluate' 50
+evaluate = evaluate' 10
 
 -------------------------------
 

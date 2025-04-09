@@ -26,6 +26,8 @@ import qualified Data.IntSet as IntSet
 import Prelude hiding (take)
 import PropRatt.HList
 import PropRatt.Utilities
+import AsyncRattus.Plugin.Annotation
+
 
 
 class Halving a where
@@ -44,9 +46,26 @@ take :: Int -> Sig a -> Sig a
 take 1 (x ::: Delay cl f) = x ::: never
 take n (x ::: xs@(Delay cl f)) = if IntSet.null cl then x ::: never else x ::: delay (take (n-1) (adv xs))
 
+{-# ANN shrinkHlistOfSig AllowRecursion #-}
 shrinkHlistOfSig :: (Halving ts) => HList (Sig t ': ts) -> [HList (Sig t ': ts)]
-shrinkHlistOfSig HNil = [HNil]
-shrinkHlistOfSig (HCons x xs) = [ HCons (shrinkSigOnce x) ys | ys <- shrinkHlistOfSig xs ] 
+shrinkHlistOfSig hls = go hls []
+  where
+    go :: (Halving ts) 
+       => HList (Sig t ': ts) 
+       -> [HList (Sig t ': ts)]  -- Accumulator for strictly shrunken candidates.
+       -> [HList (Sig t ': ts)]
+    go current acc =
+      case current of
+        HCons x HNil -> if sigLength x < 30 then acc else (halve current) : acc  -- Do not include the current candidate if it doesn't shrink further.
+        HCons x xs ->
+          if sigLength x < 30 then acc else
+          let shrunk = halve current
+          in go shrunk (shrunk : acc)
+    
+    headSignal :: HList (Sig t ': ts) -> Sig t
+    headSignal (HCons y _) = y
+
+
 
 shrinkSigOnce :: Sig a -> Sig a
 shrinkSigOnce sig = 

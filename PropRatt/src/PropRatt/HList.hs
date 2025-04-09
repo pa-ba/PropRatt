@@ -18,7 +18,7 @@
 {-# HLINT ignore "Eta reduce" #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
-module PropRatt.HList where
+module PropRatt.HList where       
 import AsyncRattus.Signal hiding (mkSig)
 import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
@@ -35,6 +35,27 @@ data HList :: [Type] -> Type where
 instance Show (HList '[]) where
   show :: HList '[] -> String
   show HNil = "HNil"
+
+type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
+  Map f '[] = '[]
+  Map f (x ': xs) = f x ': Map f xs
+
+-- Use polykinds to allow us to overload generateSignals to work for both Type and Type -> Type
+type family ToList (a :: k) :: [Type] where
+  ToList (a :: [Type]) = a
+  ToList (a :: Type)   = '[a]
+
+class HListGen (ts :: [Type]) where
+  generateHList :: Gen (HList (Map Sig ts))
+
+instance HListGen '[] where
+  generateHList = return HNil
+
+instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
+  generateHList = do
+    x <- arbitrary
+    xs <- generateHList @ts
+    return (x %: xs)
 
 infixr 5 %:
 (%:) :: x -> HList xs -> HList (x ': xs)

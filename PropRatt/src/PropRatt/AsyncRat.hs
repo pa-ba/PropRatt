@@ -31,27 +31,6 @@ import Test.QuickCheck (Arbitrary (arbitrary), Gen)
 import qualified Data.IntSet as IntSet
 import PropRatt.HList
 
-type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
-  Map f '[] = '[]
-  Map f (x ': xs) = f x ': Map f xs
-
--- Use polykinds to allow us to overload generateSignals to work for both Type and Type -> Type
-type family ToList (a :: k) :: [Type] where
-  ToList (a :: [Type]) = a
-  ToList (a :: Type)   = '[a]
-
-class HListGen (ts :: [Type]) where
-  generateHList :: Gen (HList (Map Sig ts))
-
-instance HListGen '[] where
-  generateHList = return HNil
-
-instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
-  generateHList = do
-    x <- arbitrary
-    xs <- generateHList @ts
-    return (x %: xs)
-
 class Stable (HList v) => Flatten s v | s -> v, v -> s where
   flatten :: HList s -> Sig (HList v)
 

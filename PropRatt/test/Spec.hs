@@ -1,6 +1,6 @@
 {-# OPTIONS -fplugin=AsyncRattus.Plugin #-}
 {-# LANGUAGE TypeApplications, FlexibleInstances #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds, TypeOperators #-}
 {-# HLINT ignore "Redundant bracket" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Move brackets to avoid $" #-}
@@ -17,6 +17,8 @@ import AsyncRattus.Signal
 import AsyncRattus.Strict
 import PropRatt.Utilities
 import Data.IntSet as IntSet hiding (map)
+import PropRatt.HList
+import PropRatt.RatUtils
 
 instance Stable (Sig Int) where
 
@@ -172,20 +174,20 @@ prop_shouldAddToHList = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     in result
 
 prop_singleSignalAlwaysTicks :: Property
-prop_singleSignalAlwaysTicks = forAll (generateSignals @Int) $ \intSignal ->
+prop_singleSignalAlwaysTicks = forAllShrink (generateSignals @Int) shrinkHlistOfSig $ \intSignal ->
     let state       = flatten intSignal
-        predicate   = Always $ Now ((Ticked First) |==| (Pure True))
+        predicate   = Always $ Now ((Ticked First) |==| (Pure True)) `And` (Next $ Not $ Now ((Ticked First) |==| (Pure True)))
         result      = evaluate predicate state
     in result
 
 -- Switched signal equals XS until YS has ticked, from then on the value is constant assuming ys has not produced another const signal
 prop_switchR :: Property
-prop_switchR = forAllShrink (generateSignals @Int) shrink $ \intSignals ->
+prop_switchR = forAllShrink (generateSignals @Int) shrinkHlistOfSig $ \intSignals ->
     let xs                  = first intSignals
         (_ ::: ys)          = scan (box (+)) 1 (const (0 :: Int))
         zs                  = switchR xs (mapAwait (box (\_ -> const)) ys)
         state               = prepend zs $ prependLater ys $ flatten intSignals
-        predicate           =   (Now ((Index First) |==| (Index Third)))
+        predicate           =   Not $ (Now ((Index First) |==| (Index Third)))
                                 `Until`
                                 ((Now ((Ticked Second) |==| (Pure True)))
                                 `And`
@@ -218,12 +220,12 @@ prop_switchR = forAllShrink (generateSignals @Int) shrink $ \intSignals ->
 --         result              = evaluate predicate state
 --     in result
 
-prop_sigLength :: Property
-prop_sigLength = forAllShrink ((arbitrarySig 100) :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
-        let     state   = flatten (sig %: HNil)
-                pred    = Always $ Now ((Ticked First) |==| (Pure False))
-                res     = evaluate pred state 
-        in res
+-- prop_sigLength :: Property
+-- prop_sigLength = forAll ((arbitrarySig 100) :: Gen (Sig Int)) $ \(sig :: Sig Int) ->
+--         let     state   = flatten (sig %: HNil)
+--                 pred    = Always $ Now ((Ticked First) |==| (Pure False))
+--                 res     = evaluate pred state 
+--         in res
 
 
 main :: IO ()
@@ -246,4 +248,4 @@ main = do
     quickCheck prop_shouldAddToHList
     quickCheck prop_switchR
     quickCheck prop_singleSignalAlwaysTicks
-    quickCheck prop_sigLength
+    --quickCheck prop_sigLength

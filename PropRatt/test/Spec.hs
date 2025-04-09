@@ -180,7 +180,7 @@ prop_singleSignalAlwaysTicks = forAll (generateSignals @Int) $ \intSignal ->
 
 -- Switched signal equals XS until YS has ticked, from then on the value is constant assuming ys has not produced another const signal
 prop_switchR :: Property
-prop_switchR = forAll (generateSignals @Int) $ \intSignals ->
+prop_switchR = forAllShrink (generateSignals @Int) shrink $ \intSignals ->
     let xs                  = first intSignals
         (_ ::: ys)          = scan (box (+)) 1 (const (0 :: Int))
         zs                  = switchR xs (mapAwait (box (\_ -> const)) ys)
@@ -219,7 +219,7 @@ prop_switchR = forAll (generateSignals @Int) $ \intSignals ->
 --     in result
 
 prop_sigLength :: Property
-prop_sigLength = forAll ((arbitrarySig 100) :: Gen (Sig Int)) $ \(sig :: Sig Int) ->
+prop_sigLength = forAllShrink ((arbitrarySig 100) :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
         let     state   = flatten (sig %: HNil)
                 pred    = Always $ Now ((Ticked First) |==| (Pure False))
                 res     = evaluate pred state 

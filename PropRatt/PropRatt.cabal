@@ -28,6 +28,7 @@ library
       Main
       PropRatt.AsyncRat
       PropRatt.Generators
+      PropRatt.HList
       PropRatt.LTL
       PropRatt.Playground
       PropRatt.RatUtils
@@ -52,6 +53,7 @@ executable PropRatt-exe
   other-modules:
       PropRatt.AsyncRat
       PropRatt.Generators
+      PropRatt.HList
       PropRatt.LTL
       PropRatt.Playground
       PropRatt.RatUtils

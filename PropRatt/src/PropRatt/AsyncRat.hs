@@ -29,24 +29,7 @@ import PropRatt.Value
 import Data.Kind (Type)
 import Test.QuickCheck (Arbitrary (arbitrary), Gen)
 import qualified Data.IntSet as IntSet
-
-data HList :: [Type] -> Type where
-  HNil :: HList '[]
-  HCons :: !x -> !(HList xs) -> HList (x ': xs)
-
-instance Show (HList '[]) where
-  show :: HList '[] -> String
-  show HNil = "HNil"
-
-infixr 5 %:
-(%:) :: x -> HList xs -> HList (x ': xs)
-(%:) = HCons
-
-instance (Show x, (Show (HList xs))) => Show (HList (x ': xs)) where
-  show (HCons x xs) = show x ++ " %: " ++ show xs
-
-instance Stable (HList '[]) where
-instance (Stable a, Stable (HList as)) => Stable (HList (a ': as)) where
+import PropRatt.HList
 
 type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
   Map f '[] = '[]

@@ -45,7 +45,7 @@ takeSigAndClock n (x ::: Delay cl f) = case n of
 
 lengthSig :: Sig a -> Int -> Int
 lengthSig (_ ::: Delay cl f) acc
-    | IntSet.null cl = acc
+    | IntSet.null cl = acc + 1
     | otherwise = lengthSig (f (InputValue 0 ())) (acc+1)
 
 sigLength :: Sig a -> Int

@@ -21,7 +21,7 @@ import AsyncRattus.InternalPrimitives
 import PropRatt.RatUtils
 
 cap :: Sig a -> Int -> Sig a
-cap s@(x ::: xs) 0 = x ::: never
+cap s@(x ::: xs) 1 = x ::: never
 cap (x ::: xs) n = x ::: delay (cap (adv xs) (n-1))
 
 main :: IO ()
@@ -31,6 +31,7 @@ main = do
     print sig
     print "-------------------------------------------------\n"
     print "should be 10"
+    print (sigLength sig `div` 2)
     print (take (sigLength sig `div` 2) sig)
     print "-------------------------------------------------\n"
     print (shrink sig)

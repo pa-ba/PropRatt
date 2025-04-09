@@ -29,6 +29,15 @@ instance (Arbitrary a) => Arbitrary (Sig a) where
   shrink :: Arbitrary a => Sig a -> [Sig a]
   shrink = shrinkSig
 
+
+-- instance (Arbitrary a) => Arbitrary (HList '[Sig a]) where
+--   arbitrary = generateHList
+--   shrink = 
+
+instance (Arbitrary a) => Arbitrary (HList (t ': ts)) where
+  arbitrary = generateHList
+  shrink = shrinkHlistOfSig
+
 instance (Arbitrary a) => Arbitrary (O (Sig a)) where
   arbitrary = do
     len <- choose (100, 200)

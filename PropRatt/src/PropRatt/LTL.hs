@@ -1,7 +1,5 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# LANGUAGE GADTs, DataKinds, MultiParamTypeClasses, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
@@ -22,7 +20,6 @@ module PropRatt.LTL
     (|>|),
     (|>=|),
     (|==|),
-    checkScope,
   )
 where
 
@@ -30,11 +27,10 @@ import AsyncRattus.InternalPrimitives
 import AsyncRattus.Strict
 import AsyncRattus.Signal hiding (const)
 import qualified Data.IntSet as IntSet
-import PropRatt.AsyncRat
 import Data.Kind
 import PropRatt.Value
 import PropRatt.HList
-import PropRatt.Utilities
+import PropRatt.Utils
 
 data Pred (ts :: [Type]) (t :: Type) where
   Tautology     :: Pred ts t
@@ -83,6 +79,7 @@ instance Applicative (Atom ts) where
     (<*>) :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
     Pure f <*> x = fmap f x
     Apply f g <*> x = Apply (Apply f g) x
+    (<*>) _ _ = error "Atom: unsupported constructor for applicative application."
 
 instance Num t => Num (Atom ts t) where
   (+) :: Atom ts t -> Atom ts t -> Atom ts t
@@ -139,33 +136,26 @@ checkPred predicate scope =
     valid s = s >= 0
 
 -- Checks that a signal has sufficient amount of elements to be able to check predicate at least once
-isSigValidForPred :: Pred ts t -> Int -> Bool
-isSigValidForPred predicate sigLength = minSigLengthForPred predicate sigLength 0 < sigLength
+isSmallerThanPredSteps :: Pred ts t -> Int -> Bool
+isSmallerThanPredSteps pred len = minSigLengthForPred pred len 0 < len
 
 -- Returns the amount of signal elements needed, to evaluate the predicate at least once
--- Throws an error if predicate tries to evaluate more than 100 timesteps in a single evaluation. 
--- That is ex. using 100 nested Next statements. This is not supported in the language
 minSigLengthForPred :: Pred ts t -> Int -> Int -> Int
-minSigLengthForPred predicate sigLength accSinglePredTimeUsage =
-  if accSinglePredTimeUsage >= 100
-    then error "A single predicate supports at max 100 timesteps usage. Limit your use of after/next"
-  else
+minSigLengthForPred predicate l acc =
     case predicate of
-      Tautology       -> accSinglePredTimeUsage
-      Contradiction   -> accSinglePredTimeUsage
-      Now atom        -> accSinglePredTimeUsage
-      Not p           -> minSigLengthForPred p sigLength accSinglePredTimeUsage
-      And p1 p2       -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Or p1 p2        -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Until p1 p2     -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Next p          -> minSigLengthForPred p sigLength (accSinglePredTimeUsage + 1)
-      Implies p1 p2   -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Release p1 p2   -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Always p        -> minSigLengthForPred p sigLength accSinglePredTimeUsage
-      Eventually p    -> minSigLengthForPred p sigLength accSinglePredTimeUsage
-      After n p       -> minSigLengthForPred p sigLength (accSinglePredTimeUsage + n)
-
-
+      Tautology       -> acc
+      Contradiction   -> acc
+      Now _           -> acc
+      Not p           -> minSigLengthForPred p l acc
+      And p1 p2       -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
+      Or p1 p2        -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
+      Until p1 p2     -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
+      Next p          -> minSigLengthForPred p l (acc + 1)
+      Implies p1 p2   -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
+      Release p1 p2   -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
+      Always p        -> minSigLengthForPred p l acc
+      Eventually p    -> minSigLengthForPred p l acc
+      After n p       -> minSigLengthForPred p l (acc + n)
 
 -- | Propegates the smallest scope found by traversing the atom.
 checkAtom :: Atom ts t -> Int -> Int
@@ -173,14 +163,15 @@ checkAtom atom scope =
   case atom of
     Pure _        -> scope
     Apply fun arg -> min (checkAtom fun scope) (checkAtom arg scope)
-    Index lookup  -> checkLookup lookup scope
+    Index lu      -> checkLookup lu scope
+    Ticked lu     -> checkLookup lu scope
 
 checkLookup :: Lookup ts t -> Int -> Int
-checkLookup lookup scope =
-  case lookup of
-    Previous lookup'  -> checkLookup lookup' (scope - 1)
-    Prior n lookup'   -> checkLookup lookup' (scope - n)
-    _                 -> scope
+checkLookup lu scope =
+  case lu of
+    Previous lu'  -> checkLookup lu' (scope - 1)
+    Prior n lu'   -> checkLookup lu' (scope - n)
+    _             -> scope
 
 nthPrevious :: Int -> Value t -> Maybe' (Value t)
 nthPrevious n curr@(Current b history)
@@ -204,7 +195,7 @@ evalTicked lu hls = case lu of
   Eighth     -> extract $ eighth hls
   Ninth      -> extract $ ninth hls
   where
-    errorTickedPast                   = error "Cannot check if t signal has ticked in the past."
+    errorTickedPast                   = error "Cannot check if signal has ticked in the past."
     extract (Current (HasTicked b) _) = b
 
 evalAtom :: Atom ts t -> HList ts -> Atom ts t
@@ -219,14 +210,14 @@ evalAtom (Ticked lu) hls = pure (evalTicked lu hls)
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
 evalLookup lu hls = case lu of
-  Previous lu ->
-    case evalLookup lu hls of
+  Previous lu' ->
+    case evalLookup lu' hls of
       Just' (Current b history) ->
         case history of
           _ :! xs -> Just' (Current b xs)
           Nil     -> Nothing'
       Nothing' -> Nothing'
-  Prior n lu -> case evalLookup lu hls of
+  Prior n _  -> case evalLookup lu hls of
     Just' v  -> nthPrevious n v
     Nothing' -> Nothing'
   First         -> Just' (first hls)
@@ -247,7 +238,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
         Now atom        ->
           case evalAtom atom x of
             Pure b -> b
-            _ -> error "Unexpected error during evaluation" -- unreachable
+            _ -> error "Unexpected error during evaluation."
         Not phi         -> not (eval phi sig)
         And phi psi     -> eval phi sig && eval psi sig
         Or phi psi      -> eval phi sig || eval psi sig
@@ -264,25 +255,16 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
   where
     evaluateNext = evaluate' (timestepsLeft - 1)
     eval = evaluate' timestepsLeft
-    smallest = IntSet.findMin
-    advance = f (InputValue (smallest cl) ())
-
-
--- Create checker function to check pred for minimum amount of timesteps. Pass test, if min is larger than sig length.
--- It should pass, such that the shrinker continues evaluating larger signals. 
--- Argument for passing the test is equivalent to returning true from an eventually pred that might not evaluate to true in the future but is limited by the amount that we can check
--- CheckPredicateMinimumTimestepsToEvaluate (returns true if pred needs more timesteps than length of sig) || (OR) evaluate pred
-
--- Next up; Shrink individual elements
+    smallest' = IntSet.findMin
+    advance = f (InputValue (smallest' cl) ())
 
 evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
-evaluate pred sigHls =
-  let halfLength = sigLength sigHls `div` 2
-      validSigLengthForPred = isSigValidForPred pred halfLength
-  in
-    (not validSigLengthForPred || (let minLength = minSigLengthForPred pred halfLength 0
-                                   in evaluate' (2 `max` 20) pred sigHls))
-    -- Pass test, to make shrinker move to larger signals, for better failed test prints
+evaluate pred sig =
+  let len       = sigLength sig `div` 2
+      min'      = minSigLengthForPred pred len 0
+      tooShort  = min' < len
+      scopeOk   = checkScope pred
+  in scopeOk && (not tooShort || evaluate' (min' `max` len) pred sig)
 
 -------------------------------
 
@@ -292,7 +274,7 @@ isSafetyPredicate Contradiction   = True
 isSafetyPredicate (Now _)         = True
 isSafetyPredicate (Not p)         = isSafetyPredicate p
 isSafetyPredicate (And q p)       = isSafetyPredicate q && isSafetyPredicate p
-isSafetyPredicate (Or q p)        = isSafetyPredicate q || isSafetyPredicate p
+isSafetyPredicate (Or q p)        = isSafetyPredicate q && isSafetyPredicate p
 isSafetyPredicate (Next p)        = isSafetyPredicate p
 isSafetyPredicate (Implies q p)   = isSafetyPredicate q && isSafetyPredicate p
 isSafetyPredicate (After _ p)     = isSafetyPredicate p
@@ -331,7 +313,7 @@ mkTautology = mkUnaryOp id
 mkContradiction = mkUnaryOp id
 
 mkLivenessOp :: String -> Pred ts t -> SafetyPred ts t
-mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in t safety property.")
+mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in safety property.")
 
 mkAlways, mkUntil, mkEventually, mkRelease :: Pred ts t -> SafetyPred ts t
 mkAlways = mkLivenessOp "Always"

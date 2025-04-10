@@ -9,6 +9,7 @@ import AsyncRattus.Strict
 import AsyncRattus.InternalPrimitives
 import qualified Data.IntSet as IntSet
 import Prelude hiding (map, zip, zipWith, take)
+import PropRatt.HList
 
 pickSmallestClock :: IntSet.IntSet -> Int
 pickSmallestClock = IntSet.findMin

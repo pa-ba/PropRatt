@@ -26,7 +26,7 @@ import PropRatt.HList
 
 instance (Arbitrary a) => Arbitrary (Sig a) where
   arbitrary = do
-    len <- choose (300, 300)
+    len <- choose (300, 300) -- 100 - 1000
     arbitrarySig len
   shrink :: Arbitrary a => Sig a -> [Sig a]
   shrink = shrinkSig

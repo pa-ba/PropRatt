@@ -34,6 +34,7 @@ import PropRatt.AsyncRat
 import Data.Kind
 import PropRatt.Value
 import PropRatt.HList
+import PropRatt.Utilities
 
 data Pred (ts :: [Type]) (t :: Type) where
   Tautology     :: Pred ts t
@@ -80,7 +81,7 @@ instance Applicative (Atom ts) where
     pure :: t -> Atom ts t
     pure = Pure
     (<*>) :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
-    Pure f <*> x = fmap f x              
+    Pure f <*> x = fmap f x
     Apply f g <*> x = Apply (Apply f g) x
 
 instance Num t => Num (Atom ts t) where
@@ -98,7 +99,7 @@ instance Num t => Num (Atom ts t) where
   signum = fmap signum
   fromInteger :: Integer -> Atom ts t
   fromInteger n = pure (fromInteger n)
-  
+
 (|<|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
 x |<| y = (<) <$> x <*> y
 (|<=|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
@@ -119,7 +120,7 @@ checkScope p = checkPred p 0
 -- The scope is incremented for each next constructor, and decremented for each previous or prior constructor.
 checkPred :: Pred ts t -> Int -> Bool
 checkPred predicate scope =
-  valid scope && 
+  valid scope &&
   case predicate of
     Tautology       -> valid scope
     Contradiction   -> valid scope
@@ -136,6 +137,35 @@ checkPred predicate scope =
     After _ p       -> checkPred p scope
   where
     valid s = s >= 0
+
+-- Checks that a signal has sufficient amount of elements to be able to check predicate at least once
+isSigValidForPred :: Pred ts t -> Int -> Bool
+isSigValidForPred predicate sigLength = minSigLengthForPred predicate sigLength 0 < sigLength
+
+-- Returns the amount of signal elements needed, to evaluate the predicate at least once
+-- Throws an error if predicate tries to evaluate more than 100 timesteps in a single evaluation. 
+-- That is ex. using 100 nested Next statements. This is not supported in the language
+minSigLengthForPred :: Pred ts t -> Int -> Int -> Int
+minSigLengthForPred predicate sigLength accSinglePredTimeUsage =
+  if accSinglePredTimeUsage >= 100
+    then error "A single predicate supports at max 100 timesteps usage. Limit your use of after/next"
+  else
+    case predicate of
+      Tautology       -> accSinglePredTimeUsage
+      Contradiction   -> accSinglePredTimeUsage
+      Now atom        -> accSinglePredTimeUsage
+      Not p           -> minSigLengthForPred p sigLength accSinglePredTimeUsage
+      And p1 p2       -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
+      Or p1 p2        -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
+      Until p1 p2     -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
+      Next p          -> minSigLengthForPred p sigLength (accSinglePredTimeUsage + 1)
+      Implies p1 p2   -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
+      Release p1 p2   -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
+      Always p        -> minSigLengthForPred p sigLength accSinglePredTimeUsage
+      Eventually p    -> minSigLengthForPred p sigLength accSinglePredTimeUsage
+      After n p       -> minSigLengthForPred p sigLength (accSinglePredTimeUsage + n)
+
+
 
 -- | Propegates the smallest scope found by traversing the atom.
 checkAtom :: Atom ts t -> Int -> Int
@@ -214,7 +244,7 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
   timestepsLeft <= 0 || case formulae of
         Tautology       -> True
         Contradiction   -> False
-        Now atom        -> 
+        Now atom        ->
           case evalAtom atom x of
             Pure b -> b
             _ -> error "Unexpected error during evaluation" -- unreachable
@@ -237,8 +267,22 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
     smallest = IntSet.findMin
     advance = f (InputValue (smallest cl) ())
 
+
+-- Create checker function to check pred for minimum amount of timesteps. Pass test, if min is larger than sig length.
+-- It should pass, such that the shrinker continues evaluating larger signals. 
+-- Argument for passing the test is equivalent to returning true from an eventually pred that might not evaluate to true in the future but is limited by the amount that we can check
+-- CheckPredicateMinimumTimestepsToEvaluate (returns true if pred needs more timesteps than length of sig) || (OR) evaluate pred
+
+-- Next up; Shrink individual elements
+
 evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
-evaluate = evaluate' 10
+evaluate pred sigHls =
+  let halfLength = sigLength sigHls `div` 2
+      validSigLengthForPred = isSigValidForPred pred halfLength
+  in
+    (not validSigLengthForPred || (let minLength = minSigLengthForPred pred halfLength 0
+                                   in evaluate' (2 `max` 20) pred sigHls))
+    -- Pass test, to make shrinker move to larger signals, for better failed test prints
 
 -------------------------------
 

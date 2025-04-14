@@ -143,9 +143,6 @@ isSmallerThanPredSteps pred len = minSigLengthForPred pred len 0 < len
 minSigLengthForPred :: Pred ts t -> Int -> Int -> Int
 minSigLengthForPred predicate l acc =
     case predicate of
-      Tautology       -> acc
-      Contradiction   -> acc
-      Now _           -> acc
       Not p           -> minSigLengthForPred p l acc
       And p1 p2       -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
       Or p1 p2        -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
@@ -156,6 +153,7 @@ minSigLengthForPred predicate l acc =
       Always p        -> minSigLengthForPred p l acc
       Eventually p    -> minSigLengthForPred p l acc
       After n p       -> minSigLengthForPred p l (acc + n)
+      _               -> acc
 
 -- | Propegates the smallest scope found by traversing the atom.
 checkAtom :: Atom ts t -> Int -> Int

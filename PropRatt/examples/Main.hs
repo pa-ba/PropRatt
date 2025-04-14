@@ -16,27 +16,24 @@ import PropRatt.Arbitrary
 import PropRatt.Core
 import AsyncRattus.InternalPrimitives
 import Prelude hiding (zip, map, filter, const)
-import AsyncRattus.Signal
+import AsyncRattus.Signal hiding (filter)
 import AsyncRattus.Strict
 import PropRatt.Utils
 import PropRatt.HList
 
-filter'' :: Box (a -> Bool) -> Sig a -> Sig (Maybe' a)
-filter'' f (x ::: xs) = if unbox f x
-  then Just' x ::: delay (filter'' f (adv xs))
-  else Nothing' ::: delay (filter'' f (adv xs))
+filterM :: Box (a -> Bool) -> Sig a -> Sig (Maybe' a)
+filterM f (x ::: xs) = if unbox f x
+  then Just' x ::: delay (filterM f (adv xs))
+  else Nothing' ::: delay (filterM f (adv xs))
 
-triggerMaybe :: (Stable a, Stable b) => Box (a -> b -> c) -> Sig a -> Sig b -> Sig (Maybe' c)
-triggerMaybe f (a ::: as) bs@(b:::_) = Just' (unbox f a b) ::: triggerAwaitMaybe f as bs
+triggerM :: (Stable a, Stable b) => Box (a -> b -> c) -> Sig a -> Sig b -> Sig (Maybe' c)
+triggerM f (a ::: as) bs@(b:::_) = Just' (unbox f a b) ::: triggerMAwait f as bs
 
-triggerAwaitMaybe :: Stable b => Box (a -> b -> c) -> O (Sig a) -> Sig b -> O (Sig (Maybe' c))
-triggerAwaitMaybe f as (b:::bs) = delay (case select as bs of
-            Fst (a' ::: as') bs' -> Just' (unbox f a' b) ::: triggerAwaitMaybe f as' (b ::: bs')
-            Snd as' bs' -> Nothing' ::: triggerAwaitMaybe f as' bs'
-            Both (a' ::: as') (b' ::: bs') -> Just' (unbox f a' b') ::: triggerAwaitMaybe f as' (b' ::: bs'))
-
-mkNats :: (Stable a, Floating a) => Sig a
-mkNats = scan (box (\a _ -> a + 1)) (-1) (const 0)
+triggerMAwait :: Stable b => Box (a -> b -> c) -> O (Sig a) -> Sig b -> O (Sig (Maybe' c))
+triggerMAwait f as (b:::bs) = delay (case select as bs of
+            Fst (a' ::: as') bs' -> Just' (unbox f a' b) ::: triggerMAwait f as' (b ::: bs')
+            Snd as' bs' -> Nothing' ::: triggerMAwait f as' bs'
+            Both (a' ::: as') (b' ::: bs') -> Just' (unbox f a' b') ::: triggerMAwait f as' (b' ::: bs'))
 
 stutter :: (Stable a, Stable b) => Sig a -> Sig b -> Sig a
 stutter xs ys = map (box fst') (zip xs ys)
@@ -115,35 +112,27 @@ prop_zip = forAll (generateSignals @[Int, Int]) $ \intSignals ->
 
 prop_filter :: Property
 prop_filter = forAll (generateSignals @Int) $ \charSignals ->
-  let filtered      = filter'' (box (>= 10)) (first charSignals)
-      state         = prepend filtered $ flatten charSignals
+  let filtered      = filterM (box (>= 10)) (first charSignals)
+      state         = singletonH filtered
       predicate     = Always $ Now ((Index First) |>| Pure (Just' 9))
       result        = evaluate predicate state
   in result
 
 prop_ticked :: Property
 prop_ticked = forAll (generateSignals @Int) $ \charSignals ->
-  let filtered      = filter'' (box (>= 10)) (first charSignals)
-      state         = prepend filtered $ flatten charSignals
+  let ticked        = filterM (box (>= 10)) (first charSignals)
+      state         = singletonH ticked
       predicate     = Always $ Now $ ((Ticked First)) |==| ((Pure True))
       result        = evaluate predicate state
   in result
 
-prop_trigger_maybe :: Property
-prop_trigger_maybe = forAll (generateSignals @[Int, Int]) $ \charSignals ->
-  let triggered     = triggerMaybe (box (+)) (first charSignals) (second charSignals)
-      state         = prepend triggered $ flatten charSignals
+prop_triggerM :: Property
+prop_triggerM = forAll (generateSignals @[Int, Int]) $ \intSignals ->
+  let triggered     = triggerM (box (+)) (first intSignals) (second intSignals)
+      state         = prepend triggered $ flatten intSignals
       predicate     = Always $ Implies (Now ((Ticked Second) |==| (Pure True))) (Now ((Ticked First) |==| (Pure True)))
       result        = evaluate predicate state
   in result
-
-prop_map_gt :: Property
-prop_map_gt = forAll (generateSignals @Int) $ \intSignal ->
-    let mapped      = map (box (+1)) (first intSignal)
-        state       = prepend mapped $ flatten intSignal
-        predicate   = Always $ Now ((Index First) |>| (Index Second))
-        result      = evaluate predicate state
-    in result
 
 prop_parallel :: Property
 prop_parallel = forAll (generateSignals @[Int, Int]) $ \intSignals ->
@@ -170,21 +159,21 @@ prop_isStuttering = forAll (generateSignals @[Int, Int]) $ \intSignals ->
 prop_functionIsMonotonic :: Property
 prop_functionIsMonotonic = forAll (generateSignals @Int) $ \intSignals ->
     let mono        = monotonic (first intSignals)
-        state       = prepend mono $ flatten intSignals
+        state       = singletonH mono
         predicate   = Always $ Next (Now ((Index First) |>=| (Index (Previous First))))
         result      = evaluate predicate state
     in result
 
 prop_singleSignalAlwaysTicks :: Property
-prop_singleSignalAlwaysTicks = forAllShrink (generateSignals @Int) shrinkHList $ \intSignal ->
-    let state       = flatten intSignal
-        predicate   = Always $ Now ((Ticked First) |==| (Pure False))
+prop_singleSignalAlwaysTicks = forAllShrink (arbitrarySig 100 :: Gen (Sig Int)) shrink $ \sig ->
+    let state       = singletonH sig
+        predicate   = Always $ Now ((Ticked First) |==| (Pure True))
         result      = evaluate predicate state
     in result
 
 prop_firstElement :: Property
-prop_firstElement = forAllShrink (generateSignals @[Int, Bool]) shrinkHList $ \intSignal ->
-    let state       = flatten intSignal
+prop_firstElement = forAllShrink (generateSignals @[Int, Bool]) shrinkHList $ \intSignals ->
+    let state       = flatten intSignals
         predicate   = Always $ (Now ((Index First) |<| (Pure 50))) `And` (Now ((Index Second) |==| (Pure True)))
         result      = evaluate predicate state
     in result
@@ -211,7 +200,7 @@ prop_switchR = forAllShrink (generateSignals @Int) shrinkHList $ \intSignals ->
 
 prop_sigLength :: Property
 prop_sigLength = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
-        let state   = singletonHList sig
+        let state   = singletonH sig
             pred    = Always $ Now ((Ticked First) |==| (Pure False))
             result  = evaluate pred state
         in result
@@ -219,7 +208,7 @@ prop_sigLength = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig
 prop_sigIsPositive :: Property
 prop_sigIsPositive = forAll (generateSignals @Int) $ \sig ->
         let mapped      = map (box (abs)) (first sig)
-            state       = singletonHList mapped
+            state       = singletonH mapped
             pred        = Always $ Now ((Index First) |>=| (Pure 0))
             result      = evaluate pred state 
         in result
@@ -235,8 +224,7 @@ main = do
     quickCheck prop_scan
     quickCheck prop_filter
     quickCheck prop_ticked
-    quickCheck prop_trigger_maybe
-    quickCheck prop_map_gt
+    quickCheck prop_triggerM
     quickCheck prop_parallel
     quickCheck prop_isStuttering
     quickCheck prop_functionIsMonotonic

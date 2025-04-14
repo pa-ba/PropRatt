@@ -18,7 +18,7 @@ module PropRatt.Core (
   prepend,
   prependLater,
   flatten,
-  singletonHList
+  singletonH
 ) where
 
 import AsyncRattus.Signal
@@ -29,51 +29,53 @@ import PropRatt.Arbitrary
 import qualified Data.IntSet as IntSet
 import PropRatt.HList
 
-class Stable (HList v) => Flatten s v | s -> v, v -> s where
-  flatten :: HList s -> Sig (HList v)
+class Stable (HList vals) => Flatten sigs vals | sigs -> vals, vals -> sigs where
+  flatten :: HList sigs -> Sig (HList vals)
 
-instance {-# OVERLAPPING #-} (Stable a, Stable (Value a)) => Flatten '[Sig a] '[Value a] where
+instance {-# OVERLAPPING #-} (Stable t, Stable (Value t)) => Flatten '[Sig t] '[Value t] where
+  flatten :: HList '[Sig t] -> Sig (HList '[Value t])
   flatten (HCons h HNil) = singleton h
 
-instance (Stable a, Stable (Value a), Flatten as v, Falsify v) => Flatten (Sig a ': as) (Value a ': v) where
+instance (Stable a, Stable (Value a), Flatten as bs, Falsify bs) => Flatten (Sig a ': as) (Value a ': bs) where
+  flatten :: HList (Sig a : as) -> Sig (HList (Value a : bs))
   flatten (HCons h t) = prepend h (flatten t)
 
-class Falsify a where
-  toFalse :: HList a -> HList a
+class Falsify ts where
+  toFalse :: HList ts -> HList ts
 
 instance Falsify '[] where
   toFalse :: HList '[] -> HList '[]
   toFalse _ =  HNil
 
-instance (Falsify as) => Falsify (Value a ': as) where
-  toFalse :: HList (Value a : as) -> HList (Value a : as)
-  toFalse (HCons (Current _ y) t) = Current (HasTicked False) y %: toFalse t
+instance (Falsify ts) => Falsify (Value t ': ts) where
+  toFalse :: HList (Value t : ts) -> HList (Value t : ts)
+  toFalse (HCons (Current _ x) t) = Current (HasTicked False) x %: toFalse t
 
-prependLater :: (Stable a, Stable (HList v), Falsify v) => O (Sig a) -> Sig (HList v) -> Sig (HList (Value a ': v))
+prependLater :: (Stable t, Stable (HList ts), Falsify ts) => O (Sig t) -> Sig (HList ts) -> Sig (HList (Value t ': ts))
 prependLater xs (y ::: ys) =
   HCons (Current (HasTicked False) Nil) y ::: prependAwait Nil xs y ys
 
-prepend :: (Stable a, Stable (HList v), Falsify v) => Sig a -> Sig (HList v) -> Sig (HList (Value a ': v))
+prepend :: (Stable t, Stable (HList ts), Falsify ts) => Sig t -> Sig (HList ts) -> Sig (HList (Value t ': ts))
 prepend (x ::: xs) (y ::: ys) =
   HCons (Current (HasTicked True) (x :! Nil)) y ::: prependAwait (x :! Nil) xs y ys
 
-prependAwait :: (Stable a, Stable ls, ls ~ HList v, Falsify v) => List a -> O (Sig a) -> ls -> O (Sig ls) -> O (Sig (HList (Value a ': v)))
+prependAwait :: (Stable t, Stable hls, hls ~ HList ts, Falsify ts) => List t -> O (Sig t) -> hls -> O (Sig hls) -> O (Sig (HList (Value t ': ts)))
 prependAwait x xs y ys  = delay (
   case select xs ys of
-     Fst (x' ::: xs')   ys'         -> (Current (HasTicked True) (x' :! x) %: toFalse y) ::: prependAwait (x':!x) xs' y ys'
-     Snd xs' (y' ::: ys')           -> (Current (HasTicked False) x %: y') ::: prependAwait x xs' y' ys'
-     Both (x' ::: xs') (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y') ::: prependAwait (x':!x) xs' y' ys')
+     Fst (x' ::: xs')   ys'         -> (Current (HasTicked True) (x' :! x) %: toFalse y)  ::: prependAwait (x' :! x) xs' y ys'
+     Snd xs' (y' ::: ys')           -> (Current (HasTicked False) x %: y')                ::: prependAwait x xs' y' ys'
+     Both (x' ::: xs') (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y')         ::: prependAwait (x' :! x) xs' y' ys')
 
-singleton ::  (Stable a) => Sig a -> Sig (HList (Map Value '[a]))
+singleton ::  (Stable t) => Sig t -> Sig (HList (Map Value '[t]))
 singleton sig = singletonAwait sig Nil
 
-singletonAwait :: (Stable a) => Sig a -> List a -> Sig (HList (Map Value '[a]))
+singletonAwait :: (Stable t) => Sig t -> List t -> Sig (HList (Map Value '[t]))
 singletonAwait (h ::: t@(Delay cl _)) acc = if IntSet.null cl 
   then HCons (Current (HasTicked True) (h :! acc)) HNil ::: never
   else HCons (Current (HasTicked True) (h :! acc)) HNil ::: delay (singletonAwait (adv t) (h :! acc))
 
-singletonHList :: (Stable a) => Sig a -> Sig (HList '[Value a])
-singletonHList sig = flatten (sig %: HNil)
+singletonH :: (Stable t) => Sig t -> Sig (HList '[Value t])
+singletonH sig = flatten (sig %: HNil)
 
-never :: O (Sig (HList (Map Value '[a])))
+never :: O (Sig (HList (Map Value '[t])))
 never = Delay IntSet.empty (error "Trying to adv on the 'never' delayed computation")

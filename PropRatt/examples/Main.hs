@@ -8,18 +8,14 @@
 {-# HLINT ignore "Move brackets to avoid $" #-}
 {-# HLINT ignore "Use const" #-}
 
-module Main where
+module Main (main) where
     
 import Test.QuickCheck
-import PropRatt.LTL
-import PropRatt.Arbitrary
-import PropRatt.Core
+import PropRatt
 import AsyncRattus.InternalPrimitives
-import Prelude hiding (zip, map, filter, const)
+import Prelude hiding (zip, map, const)
 import AsyncRattus.Signal hiding (filter)
 import AsyncRattus.Strict
-import PropRatt.Utils
-import PropRatt.HList
 
 filterM :: Box (a -> Bool) -> Sig a -> Sig (Maybe' a)
 filterM f (x ::: xs) = if unbox f x
@@ -165,7 +161,7 @@ prop_functionIsMonotonic = forAll (generateSignals @Int) $ \intSignals ->
     in result
 
 prop_singleSignalAlwaysTicks :: Property
-prop_singleSignalAlwaysTicks = forAllShrink (arbitrarySig 100 :: Gen (Sig Int)) shrink $ \sig ->
+prop_singleSignalAlwaysTicks = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \sig ->
     let state       = singletonH sig
         predicate   = Always $ Now ((Ticked First) |==| (Pure True))
         result      = evaluate predicate state
@@ -201,16 +197,16 @@ prop_switchR = forAllShrink (generateSignals @Int) shrinkHList $ \intSignals ->
 prop_sigLength :: Property
 prop_sigLength = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
         let state   = singletonH sig
-            pred    = Always $ Now ((Ticked First) |==| (Pure False))
-            result  = evaluate pred state
+            predicate    = Always $ Now ((Ticked First) |==| (Pure False))
+            result  = evaluate predicate state
         in result
 
 prop_sigIsPositive :: Property
 prop_sigIsPositive = forAll (generateSignals @Int) $ \sig ->
         let mapped      = map (box (abs)) (first sig)
             state       = singletonH mapped
-            pred        = Always $ Now ((Index First) |>=| (Pure 0))
-            result      = evaluate pred state 
+            predicate        = Always $ Now ((Index First) |>=| (Pure 0))
+            result      = evaluate predicate state 
         in result
 
 main :: IO ()

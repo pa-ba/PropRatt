@@ -13,8 +13,6 @@ module PropRatt.LTL
     evaluate,
     Atom (..),
     Lookup (..),
-    SafetyError,
-    SafetyPred,
     (|<|),
     (|<=|),
     (|>|),
@@ -135,10 +133,6 @@ checkPred predicate scope =
   where
     valid s = s >= 0
 
--- Checks that a signal has sufficient amount of elements to be able to check predicate at least once
-isSmallerThanPredSteps :: Pred ts t -> Int -> Bool
-isSmallerThanPredSteps pred len = minSigLengthForPred pred len 0 < len
-
 -- Returns the amount of signal elements needed, to evaluate the predicate at least once
 minSigLengthForPred :: Pred ts t -> Int -> Int -> Int
 minSigLengthForPred predicate l acc =
@@ -257,64 +251,62 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
     advance = f (InputValue (smallest' cl) ())
 
 evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
-evaluate pred sig =
+evaluate p sig =
   let len       = sigLength sig `div` 2
-      min'      = minSigLengthForPred pred len 0
+      min'      = minSigLengthForPred p len 0
       tooShort  = min' < len
-      scopeOk   = checkScope pred
-  in scopeOk && (not tooShort || evaluate' (min' `max` len) pred sig)
+      scopeOk   = checkScope p
+  in scopeOk && (not tooShort || evaluate' (min' `max` len) p sig)
 
--------------------------------
+-- isSafetyPredicate :: Pred ts t -> Bool
+-- isSafetyPredicate Tautology       = True
+-- isSafetyPredicate Contradiction   = True
+-- isSafetyPredicate (Now _)         = True
+-- isSafetyPredicate (Not p)         = isSafetyPredicate p
+-- isSafetyPredicate (And q p)       = isSafetyPredicate q && isSafetyPredicate p
+-- isSafetyPredicate (Or q p)        = isSafetyPredicate q && isSafetyPredicate p
+-- isSafetyPredicate (Next p)        = isSafetyPredicate p
+-- isSafetyPredicate (Implies q p)   = isSafetyPredicate q && isSafetyPredicate p
+-- isSafetyPredicate (After _ p)     = isSafetyPredicate p
+-- isSafetyPredicate (Until _ _)     = False
+-- isSafetyPredicate (Always _ )     = False
+-- isSafetyPredicate (Eventually _ ) = False
+-- isSafetyPredicate (Release _ _)   = False
 
-isSafetyPredicate :: Pred ts t -> Bool
-isSafetyPredicate Tautology       = True
-isSafetyPredicate Contradiction   = True
-isSafetyPredicate (Now _)         = True
-isSafetyPredicate (Not p)         = isSafetyPredicate p
-isSafetyPredicate (And q p)       = isSafetyPredicate q && isSafetyPredicate p
-isSafetyPredicate (Or q p)        = isSafetyPredicate q && isSafetyPredicate p
-isSafetyPredicate (Next p)        = isSafetyPredicate p
-isSafetyPredicate (Implies q p)   = isSafetyPredicate q && isSafetyPredicate p
-isSafetyPredicate (After _ p)     = isSafetyPredicate p
-isSafetyPredicate (Until _ _)     = False
-isSafetyPredicate (Always _ )     = False
-isSafetyPredicate (Eventually _ ) = False
-isSafetyPredicate (Release _ _)   = False
+-- type SafetyPred ts t = Either SafetyError (Pred ts t)
 
-type SafetyPred ts t = Either SafetyError (Pred ts t)
+-- newtype SafetyError = SafetyError String
 
-newtype SafetyError = SafetyError String
+-- mkSafePred :: Pred ts t -> SafetyPred ts t
+-- mkSafePred p
+--   | isSafetyPredicate p = Right p
+--   | otherwise = Left $ SafetyError "Predicate is t safety property."
 
-mkSafePred :: Pred ts t -> SafetyPred ts t
-mkSafePred p
-  | isSafetyPredicate p = Right p
-  | otherwise = Left $ SafetyError "Predicate is t safety property."
+-- mkBinaryOp :: (Pred ts t -> Pred ts t -> Pred ts t) -> Pred ts t -> Pred ts t -> SafetyPred ts t
+-- mkBinaryOp op p q = do
+--   p' <- mkSafePred p
+--   q' <- mkSafePred q
+--   return (op p' q')
 
-mkBinaryOp :: (Pred ts t -> Pred ts t -> Pred ts t) -> Pred ts t -> Pred ts t -> SafetyPred ts t
-mkBinaryOp op p q = do
-  p' <- mkSafePred p
-  q' <- mkSafePred q
-  return (op p' q')
+-- mkAnd, mkOr, mkImplies :: Pred ts t -> Pred ts t -> SafetyPred ts t
+-- mkAnd = mkBinaryOp And
+-- mkOr = mkBinaryOp Or
+-- mkImplies = mkBinaryOp Implies
 
-mkAnd, mkOr, mkImplies :: Pred ts t -> Pred ts t -> SafetyPred ts t
-mkAnd = mkBinaryOp And
-mkOr = mkBinaryOp Or
-mkImplies = mkBinaryOp Implies
+-- mkUnaryOp :: (Pred ts t -> Pred ts t) -> Pred ts t -> SafetyPred ts t
+-- mkUnaryOp op = mkSafePred . op
 
-mkUnaryOp :: (Pred ts t -> Pred ts t) -> Pred ts t -> SafetyPred ts t
-mkUnaryOp op = mkSafePred . op
+-- mkNext, mkNow, mkTautology, mkContradiction :: Pred ts t -> SafetyPred ts t
+-- mkNext = mkUnaryOp id
+-- mkNow = mkUnaryOp id
+-- mkTautology = mkUnaryOp id
+-- mkContradiction = mkUnaryOp id
 
-mkNext, mkNow, mkTautology, mkContradiction :: Pred ts t -> SafetyPred ts t
-mkNext = mkUnaryOp id
-mkNow = mkUnaryOp id
-mkTautology = mkUnaryOp id
-mkContradiction = mkUnaryOp id
+-- mkLivenessOp :: String -> Pred ts t -> SafetyPred ts t
+-- mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in safety property.")
 
-mkLivenessOp :: String -> Pred ts t -> SafetyPred ts t
-mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in safety property.")
-
-mkAlways, mkUntil, mkEventually, mkRelease :: Pred ts t -> SafetyPred ts t
-mkAlways = mkLivenessOp "Always"
-mkUntil = mkLivenessOp "Until"
-mkEventually = mkLivenessOp "Eventually"
-mkRelease = mkLivenessOp "Release"
+-- mkAlways, mkUntil, mkEventually, mkRelease :: Pred ts t -> SafetyPred ts t
+-- mkAlways = mkLivenessOp "Always"
+-- mkUntil = mkLivenessOp "Until"
+-- mkEventually = mkLivenessOp "Eventually"
+-- mkRelease = mkLivenessOp "Release"

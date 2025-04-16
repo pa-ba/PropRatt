@@ -16,6 +16,9 @@ import AsyncRattus.InternalPrimitives
 import Prelude hiding (zip, map, const)
 import AsyncRattus.Signal hiding (filter)
 import AsyncRattus.Strict
+import Prelude hiding (const, map, zip, take)
+import PropRatt.Utils
+
 
 filterM :: Box (a -> Bool) -> Sig a -> Sig (Maybe' a)
 filterM f (x ::: xs) = if unbox f x
@@ -64,7 +67,7 @@ prop_jump = forAll (generateSignals @Int) $ \intSignals ->
     in result
 
 prop_scan :: Property
-prop_scan =  forAllShrink (generateSignals @Int) shrinkHList $ \intSignals ->
+prop_scan =  forAllShrink (generateSignals @Int) shrinkHls $ \intSignals ->
     let prefixSum   = scan (box (+)) 0 (first intSignals)
         state       = prepend prefixSum $ flatten intSignals
         predicate   = Next $ Always $ Now $ Index (Previous First) |<| (Index First)
@@ -168,20 +171,22 @@ prop_singleSignalAlwaysTicks = forAllShrink (arbitrary :: Gen (Sig Int)) shrink 
     in result
 
 prop_firstElement :: Property
-prop_firstElement = forAllShrink (generateSignals @[Int, Bool]) shrinkHList $ \intSignals ->
+prop_firstElement = forAllShrink (generateSignals @[Int, Bool]) shrinkHls $ \intSignals ->
     let state       = flatten intSignals
-        predicate   = Always $ (Now ((Index First) |<| (Pure 50))) `And` (Now ((Index Second) |==| (Pure True)))
+        predicate   = Always $ (Now ((Index First) |<| (Pure 50))) -- `And` (Now ((Index Second) |==| (Pure True)))
         result      = evaluate predicate state
     in result
 
+-- ZS == XS `Until` (HasTicked ys AND (Implies (Next (Always (Not (HasTicked ys)))) (Index (Previous ZS)) |==| (Index ZS))) AND (NOT (ZS |==| Previous (Index ZS)))
+
 -- Switched signal equals XS until YS has ticked, from then on the value is constant assuming ys has not produced another const signal
 prop_switchR :: Property
-prop_switchR = forAllShrink (generateSignals @Int) shrinkHList $ \intSignals ->
+prop_switchR = forAllShrink (generateSignals @Int ) shrinkHls $ \intSignals ->
     let xs                  = first intSignals
-        (_ ::: ys)          = scan (box (+)) 1 (const (0 :: Int))
+        (_ ::: ys)          = (scan (box (\n _ -> n + 1)) 0 (takeSigSig (sigLength xs) mkSigZero)) :: Sig Int
         zs                  = switchR xs (mapAwait (box (\_ -> const)) ys)
         state               = prepend zs $ prependLater ys $ flatten intSignals
-        predicate           =   Not $ (Now ((Index First) |==| (Index Third)))
+        predicate           = (Now ((Index First) |==| (Index Third)))
                                 `Until`
                                 ((Now ((Ticked Second) |==| (Pure True)))
                                 `And`
@@ -196,8 +201,8 @@ prop_switchR = forAllShrink (generateSignals @Int) shrinkHList $ \intSignals ->
 
 prop_sigLength :: Property
 prop_sigLength = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
-        let state   = singletonH sig
-            predicate    = Always $ Now ((Ticked First) |==| (Pure False))
+        let state   = singletonH (sig :: Sig Int)
+            predicate    = Always $ (Now ((Index First) |<| (Pure 50)))  -- Always $ Now ((Ticked First) |==| (Pure False))
             result  = evaluate predicate state
         in result
 
@@ -205,12 +210,23 @@ prop_sigIsPositive :: Property
 prop_sigIsPositive = forAll (generateSignals @Int) $ \sig ->
         let mapped      = map (box (abs)) (first sig)
             state       = singletonH mapped
-            predicate        = Next $ Always  $ Now ((Index (Prior 1 First)) |>=| (Pure 0))
+            predicate   = Next $ Always $ Now ((Index (Prior 1 First)) |>=| (Pure 0))
             result      = evaluate predicate state 
         in result
 
+prop_catchsubtle :: Property
+prop_catchsubtle = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
+        let state   = singletonH (sig :: Sig Int)
+            predicate    = Always $ Implies (Now ((Index First) |>| (Pure 20))) (Next $ (Now ((Index First) |>| (Index (Previous First)))))
+            result  = evaluate predicate state
+        in result
+
+
 main :: IO ()
 main = do
+    -- examplehls <- generate (generateSignals @[Int, Bool])
+    -- print (shrinkHls examplehls)
+
     quickCheck prop_interleave
     quickCheck prop_switchedSignal
     quickCheck prop_buffer
@@ -229,3 +245,4 @@ main = do
     quickCheck prop_firstElement
     quickCheck prop_sigLength
     quickCheck prop_sigIsPositive
+    quickCheck prop_catchsubtle

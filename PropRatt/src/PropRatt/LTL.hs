@@ -134,19 +134,19 @@ checkPred predicate scope =
     valid s = s >= 0
 
 -- Returns the amount of signal elements needed, to evaluate the predicate at least once
-minSigLengthForPred :: Pred ts t -> Int -> Int -> Int
-minSigLengthForPred predicate l acc =
+minSigLengthForPred :: Pred ts t -> Int -> Int
+minSigLengthForPred predicate acc =
     case predicate of
-      Not p           -> minSigLengthForPred p l acc
-      And p1 p2       -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
-      Or p1 p2        -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
-      Until p1 p2     -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
-      Next p          -> minSigLengthForPred p l (acc + 1)
-      Implies p1 p2   -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
-      Release p1 p2   -> minSigLengthForPred p1 l acc + minSigLengthForPred p2 l acc
-      Always p        -> minSigLengthForPred p l acc
-      Eventually p    -> minSigLengthForPred p l acc
-      After n p       -> minSigLengthForPred p l (acc + n)
+      Not p           -> minSigLengthForPred p acc
+      And p1 p2       -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Or p1 p2        -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Until p1 p2     -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Next p          -> minSigLengthForPred p (acc + 1)
+      Implies p1 p2   -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Release p1 p2   -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Always p        -> minSigLengthForPred p acc
+      Eventually p    -> minSigLengthForPred p acc
+      After n p       -> minSigLengthForPred p (acc + n)
       _               -> acc
 
 -- | Propegates the smallest scope found by traversing the atom.
@@ -209,7 +209,7 @@ evalLookup lu hls = case lu of
           _ :! xs -> Just' (Current b xs)
           Nil     -> Nothing'
       Nothing' -> Nothing'
-  Prior n lu'  -> case evalLookup lu' hls of -- Infinite recursion?? (if lu is thrown away _ )
+  Prior n lu'  -> case evalLookup lu' hls of
     Just' v  -> nthPrevious n v
     Nothing' -> Nothing'
   First         -> Just' (first hls)
@@ -224,39 +224,74 @@ evalLookup lu hls = case lu of
 
 evaluate' :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
 evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
-  timestepsLeft <= 0 || case formulae of
-        Tautology       -> True
-        Contradiction   -> False
-        Now atom        ->
-          case evalAtom atom x of
-            Pure b -> b
-            _ -> error "Unexpected error during evaluation."
-        Not phi         -> not (eval phi sig)
-        And phi psi     -> eval phi sig && eval psi sig
-        Or phi psi      -> eval phi sig || eval psi sig
-        Until phi psi   -> eval psi sig
-                           || (eval phi sig && evaluateNext (phi `Until` psi) advance)
-        Next phi        -> evaluateNext phi advance
-        Implies phi psi -> not (eval phi sig && not (eval psi sig))
-        Always phi      -> eval phi sig && evaluateNext (Always phi) advance
-        Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
-                            && not (timestepsLeft == 1 && not (eval phi sig))
-        Release phi psi -> (eval psi sig && eval phi sig)
-                            || (eval psi sig && evaluateNext (phi `Until` psi) advance)
-        After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
-  where
-    evaluateNext = evaluate' (timestepsLeft - 1)
-    eval = evaluate' timestepsLeft
-    smallest' = IntSet.findMin
-    advance = f (InputValue (smallest' cl) ())
+  if IntSet.null cl 
+    then timestepsLeft <= 0 || case formulae of
+            Tautology       -> True
+            Contradiction   -> False
+            Now atom        ->
+              case evalAtom atom x of
+                Pure b -> b
+                _ -> error "Unexpected error during evaluation."
+            Not phi         -> not (eval phi sig)
+            And phi psi     -> eval phi sig && eval psi sig
+            Or phi psi      -> eval phi sig || eval psi sig
+            Until phi psi   -> eval psi sig || eval phi sig -- eval psi sig -- Very possible wrong???
+            Next phi        -> True
+            Implies phi psi -> not (eval phi sig && not (eval psi sig))
+            Always phi      -> eval phi sig -- && evaluateNext (Always phi) advance
+            Eventually phi  -> eval phi sig  -- || evaluateNext (Eventually phi) advance)
+                               -- && not (timestepsLeft == 1 && not (eval phi sig))
+            Release phi psi -> True -- (eval psi sig && eval phi sig)
+                                -- || (eval psi sig && evaluateNext (phi `Until` psi) advance)
+            After n phi     -> True -- if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
+    else timestepsLeft <= 0 || case formulae of
+            Tautology       -> True
+            Contradiction   -> False
+            Now atom        ->
+              case evalAtom atom x of
+                Pure b -> b
+                _ -> error "Unexpected error during evaluation."
+            Not phi         -> not (eval phi sig)
+            And phi psi     -> eval phi sig && eval psi sig
+            Or phi psi      -> eval phi sig || eval psi sig
+            Until phi psi   -> eval psi sig
+                              || (eval phi sig && evaluateNext (phi `Until` psi) advance)
+            Next phi        -> evaluateNext phi advance
+            Implies phi psi -> not (eval phi sig && not (eval psi sig))
+            Always phi      -> eval phi sig && evaluateNext (Always phi) advance
+            Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
+                                && not (timestepsLeft == 1 && not (eval phi sig))
+            Release phi psi -> (eval psi sig && eval phi sig)
+                                || (eval psi sig && evaluateNext (phi `Until` psi) advance)
+            After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
+      where
+        evaluateNext = evaluate' (timestepsLeft - 1)
+        eval = evaluate' timestepsLeft
+        -- When having an Always, on a signal with only 1 element, we try to advance on the empty clock. 
+        -- We might need to refactor this, to have a check for null clock before advancing, and maybe just passing the test if clock is null
+        advance = f (InputValue (IntSet.findMin cl) ())
 
+
+-- Shrinking is iteratively. Start by cutting length in half. Then later on do it on element level
+-- Copy code from widgetrattus example and test it within our project here.
+-- Find properties that dont hold. 
+-- Pick reasonable default arbitrary signal length. and then be able to set your own length
+-- PBT = testing how a program should behave instead of coverage
+
+
+-- Is the signal too short? Then Pass the test (this is only for the shrinker to avoid evaluating and advancing on signals with no clocks/no later values)
+-- Passing the test, when signal is too short, will not be reached in a passing test, as arbitrary signals are of a hardcoded length (e.g. 100). 
+-- (Unless you provide a predicate that checks more than 100 timesteps, which is considered a user error)
+-- 
 evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
 evaluate p sig =
-  let len       = sigLength sig `div` 2
-      min'      = minSigLengthForPred p len 0
-      tooShort  = min' < len
+  let len       = sigLength sig
+      -- Find the minimum length that a signal must have, in order for the pred to be tested.
+      min'      = minSigLengthForPred p 1
+  in if min' > 100 then error "Predicate must not check more than 100 timesteps in a single predicate" else
+  let tooShort  = len < min'
       scopeOk   = checkScope p
-  in scopeOk && (not tooShort || evaluate' (min' `max` len) p sig)
+  in scopeOk && (tooShort || evaluate' (min' `max` len) p sig)
 
 -- isSafetyPredicate :: Pred ts t -> Bool
 -- isSafetyPredicate Tautology       = True

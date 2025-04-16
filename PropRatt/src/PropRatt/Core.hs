@@ -28,13 +28,16 @@ import PropRatt.Value
 import PropRatt.Arbitrary
 import qualified Data.IntSet as IntSet
 import PropRatt.HList
+import Prelude hiding (const)
+
+emptySig :: Sig (HList '[])
+emptySig = const HNil
 
 class Stable (HList vals) => Flatten sigs vals | sigs -> vals, vals -> sigs where
   flatten :: HList sigs -> Sig (HList vals)
 
-instance {-# OVERLAPPING #-} (Stable t, Stable (Value t)) => Flatten '[Sig t] '[Value t] where
-  flatten :: HList '[Sig t] -> Sig (HList '[Value t])
-  flatten (HCons h HNil) = singleton h
+instance Flatten '[] '[] where
+  flatten HNil = emptySig
 
 instance (Stable a, Stable (Value a), Flatten as bs, Falsify bs) => Flatten (Sig a ': as) (Value a ': bs) where
   flatten :: HList (Sig a : as) -> Sig (HList (Value a : bs))

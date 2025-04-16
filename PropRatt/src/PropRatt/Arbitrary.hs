@@ -20,9 +20,14 @@ module PropRatt.Arbitrary
   ( arbitrarySig,
     Sig (..),
     generateSignals,
-    shrinkHList,
     Map,
-    ToList
+    ToList,
+    take,
+    shrinkSignal,
+    shrinkOne,
+    removes,
+    drop,
+    shrinkHls
   )
 where
 
@@ -33,15 +38,13 @@ import qualified Data.IntSet as IntSet
 import PropRatt.Utils
 import Data.Kind (Type)
 import Test.QuickCheck
-import Prelude hiding (take)
+import Prelude hiding (const, drop, take)
 import PropRatt.HList
 
 instance (Arbitrary a) => Arbitrary (Sig a) where
-  arbitrary = do
-    len <- choose (100, 1000)
-    arbitrarySig len
+  arbitrary = arbitrarySig 100
   shrink :: Sig a -> [Sig a]
-  shrink = shrinkSig
+  shrink = shrinkSignal shrink
 
 instance (Show a) => Show (Sig a) where
   show (x ::: xs) = show (toList (x ::: xs))
@@ -49,18 +52,49 @@ instance (Show a) => Show (Sig a) where
 instance (Eq a) => Eq (Sig a) where
   (==) sig1 sig2 = toList sig1 == toList sig2
 
-shrinkSig :: Sig a -> [Sig a]
-shrinkSig sig = shrinkHelper sig []
 
-{-# ANN shrinkHelper AllowRecursion #-}
-shrinkHelper :: Sig a -> [Sig a] -> [Sig a]
-shrinkHelper sig acc =
-  let len = sigLength sig `div` 2
-      newSig = take sig len
-      acc' = (newSig : acc)
-  in if len <= 1
-     then acc'
-     else shrinkHelper newSig acc'
+shrinkSignal :: (a -> [a]) -> Sig a -> [Sig a]
+shrinkSignal shr sig@(y ::: ys@(Delay cly fy))
+  | IntSet.null cly = shrinkOne sig shr
+  | otherwise = concat [ removes k n sig | k <- takeWhile (>0) (iterate (`div`2) n) ]
+    ++ shrinkOne sig shr
+  where
+    n = sigLength sig
+
+
+{-# ANN shrinkOne AllowRecursion #-}
+shrinkOne :: Sig a -> (a -> [a]) -> [Sig a]
+shrinkOne (x ::: xs@(Delay cl f)) shr
+  | IntSet.null cl = [ x' ::: xs | x'  <- shr x ]
+  | otherwise = [ x' ::: xs | x'  <- shr x ]
+                ++ [ x ::: Delay cl (\_ -> xs') | xs' <- (shrinkOne (f (InputValue (IntSet.findMin cl) ())) shr) ]
+
+{-# ANN removes AllowRecursion #-}
+removes :: Int -> Int -> Sig a -> [Sig a]
+removes k n sig =
+  if k >= n
+    then []
+    else let xs1 = take k sig
+             xs2 = drop k sig
+         in xs1 : xs2 : map (append xs1) (removes k (n-k) xs2)
+
+{-# ANN take AllowRecursion #-}
+take :: Int -> Sig a -> Sig a
+take 1 (x ::: _)    = x ::: never
+take k (x ::: xs)   = x ::: delay (take (k-1) (adv xs))
+
+{-# ANN drop AllowRecursion #-}
+drop :: Int -> Sig a -> Sig a
+drop n sig@(x ::: (Delay cl f))
+  | n <= 0    = sig
+  | otherwise = drop (n-1) (f (InputValue (IntSet.findMin cl) ()))
+
+{-# ANN append AllowRecursion #-}
+append :: Sig a -> Sig a -> Sig a
+append (x ::: xs@(Delay cl fx)) y
+  | IntSet.null cl = x ::: Delay (IntSet.fromList [1,2,3]) (\_ -> (y))
+  | otherwise      = x ::: Delay cl (\_ -> append (fx (InputValue (IntSet.findMin cl) ())) y)
+
 
 genClockChannel :: Gen Int
 genClockChannel = chooseInt (1, 3)
@@ -73,17 +107,20 @@ genClockList = do
 {-# ANN arbitrarySig AllowRecursion #-}
 arbitrarySig :: (Arbitrary a) => Int -> Gen (Sig a)
 arbitrarySig n = do
-  go n
-  where
-    go 0 = do
-      x <- arbitrary
-      return (x ::: never)
-    go m = do
-      x <- arbitrary
-      cl <- genClockList
-      xs <- go (m - 1)
-      let later = Delay (IntSet.fromList cl) (\_ -> xs)
-      return (x ::: later)
+  if n <= 0
+    then error "Cannot create empty signals"
+    else
+      go n
+      where
+        go 1 = do
+          x <- arbitrary
+          return (x ::: never)
+        go m = do
+          x <- arbitrary
+          cl <- genClockList
+          xs <- go (m - 1)
+          let later = Delay (IntSet.fromList cl) (\_ -> xs)
+          return (x ::: later)
 
 type family Map (f :: Type -> Type) (xs :: [Type]) :: [Type] where
   Map f '[] = '[]
@@ -109,39 +146,11 @@ instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
 generateSignals :: forall a. HListGen (ToList a) => Gen (HList (Map Sig (ToList a)))
 generateSignals = generateHList @(ToList a)
 
-class Halving a where
-  halve :: HList a -> HList a
+class ShrinkHList as where
+  shrinkHls :: HList as -> [HList as]
 
-instance Halving '[] where
-  halve :: HList '[] -> HList '[]
-  halve _ =  HNil
+instance ShrinkHList '[] where
+  shrinkHls _ = [HNil]
 
-instance (Halving as) => Halving (Sig a ': as) where
-  halve :: HList (Sig a : as) -> HList (Sig a : as)
-  halve (HCons x xs) = shrinkSigOnce x %: halve xs
-
-{-# ANN shrinkHList AllowRecursion #-}
-shrinkHList :: (Halving ts) => HList (Sig t ': ts) -> [HList (Sig t ': ts)]
-shrinkHList hls = go hls []
-  where
-    go :: (Halving ts) => HList (Sig t ': ts) -> [HList (Sig t ': ts)] -> [HList (Sig t ': ts)]
-    go curr acc =
-      case curr of
-        HCons x HNil -> (halve curr) : acc
-        HCons x _ ->
-          if sigLength x <= 1 then (halve curr) : acc else
-          let shrunk = halve curr
-          in go shrunk (shrunk : acc)
-    
-shrinkSigOnce :: Sig a -> Sig a
-shrinkSigOnce sig = take sig $ halfLength sig
-
-halfLength :: Sig a -> Int
-halfLength sig = sigLength sig `div` 2
-
-take :: Sig a -> Int -> Sig a
-take (x ::: _) 1 = x ::: never
-take (x ::: xs@(Delay cl _)) n = 
-  if IntSet.null cl 
-    then x ::: never 
-    else x ::: delay (take (adv xs) (n-1))
+instance (Arbitrary a, ShrinkHList as) => ShrinkHList (a ': as) where
+  shrinkHls (HCons x xs) = [ HCons x' xs' | x' <- shrink x, xs' <- shrinkHls xs ]

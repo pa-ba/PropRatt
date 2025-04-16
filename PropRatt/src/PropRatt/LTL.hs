@@ -209,7 +209,7 @@ evalLookup lu hls = case lu of
           _ :! xs -> Just' (Current b xs)
           Nil     -> Nothing'
       Nothing' -> Nothing'
-  Prior n _  -> case evalLookup lu hls of
+  Prior n lu'  -> case evalLookup lu' hls of -- Infinite recursion?? (if lu is thrown away _ )
     Just' v  -> nthPrevious n v
     Nothing' -> Nothing'
   First         -> Just' (first hls)

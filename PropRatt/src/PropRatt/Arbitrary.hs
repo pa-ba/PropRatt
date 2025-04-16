@@ -127,9 +127,9 @@ shrinkHList hls = go hls []
     go :: (Halving ts) => HList (Sig t ': ts) -> [HList (Sig t ': ts)] -> [HList (Sig t ': ts)]
     go curr acc =
       case curr of
-        HCons x HNil -> if sigLength x <= 1 then acc else halve curr : acc 
+        HCons x HNil -> (halve curr) : acc
         HCons x _ ->
-          if sigLength x <= 1 then acc else
+          if sigLength x <= 1 then (halve curr) : acc else
           let shrunk = halve curr
           in go shrunk (shrunk : acc)
     

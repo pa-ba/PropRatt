@@ -205,7 +205,7 @@ prop_sigIsPositive :: Property
 prop_sigIsPositive = forAll (generateSignals @Int) $ \sig ->
         let mapped      = map (box (abs)) (first sig)
             state       = singletonH mapped
-            predicate        = Always $ Now ((Index First) |>=| (Pure 0))
+            predicate        = Next $ Always  $ Now ((Index (Prior 1 First)) |>=| (Pure 0))
             result      = evaluate predicate state 
         in result
 

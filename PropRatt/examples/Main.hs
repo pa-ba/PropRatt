@@ -16,8 +16,9 @@ import AsyncRattus.InternalPrimitives
 import Prelude hiding (zip, map, const)
 import AsyncRattus.Signal hiding (filter)
 import AsyncRattus.Strict
-import Prelude hiding (const, map, zip, take)
+import Prelude hiding (const, map, zip)
 import PropRatt.Utils
+import qualified Data.IntSet as IntSet
 
 
 filterM :: Box (a -> Bool) -> Sig a -> Sig (Maybe' a)
@@ -171,11 +172,18 @@ prop_singleSignalAlwaysTicks = forAllShrink (arbitrary :: Gen (Sig Int)) shrink 
     in result
 
 prop_firstElement :: Property
-prop_firstElement = forAllShrink (generateSignals @[Int, Bool]) shrinkHls $ \intSignals ->
+prop_firstElement = forAllShrink (generateSignals @[Int, Bool, Bool, Int]) shrinkHls $ \intSignals ->
     let state       = flatten intSignals
         predicate   = Always $ (Now ((Index First) |<| (Pure 50))) -- `And` (Now ((Index Second) |==| (Pure True)))
         result      = evaluate predicate state
-    in result
+    in counterexample (show (first intSignals)) result
+
+prop_firstElement2 :: Property
+prop_firstElement2 = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \intSignal ->
+    let state       = singletonH intSignal
+        predicate   = Always $ (Now ((Index First) |<| (Pure 50))) -- `And` (Now ((Index Second) |==| (Pure True)))
+        result      = evaluate predicate state
+    in counterexample (show intSignal) result
 
 -- ZS == XS `Until` (HasTicked ys AND (Implies (Next (Always (Not (HasTicked ys)))) (Index (Previous ZS)) |==| (Index ZS))) AND (NOT (ZS |==| Previous (Index ZS)))
 
@@ -183,21 +191,36 @@ prop_firstElement = forAllShrink (generateSignals @[Int, Bool]) shrinkHls $ \int
 prop_switchR :: Property
 prop_switchR = forAllShrink (generateSignals @Int ) shrinkHls $ \intSignals ->
     let xs                  = first intSignals
-        (_ ::: ys)          = (scan (box (\n _ -> n + 1)) 0 (takeSigSig (sigLength xs) mkSigZero)) :: Sig Int
+        gg@(_ ::: ys)       = (scan (box (\n _ -> n + 1)) 0 (takeSigSig (sigLength xs) mkSigZero)) :: Sig Int
         zs                  = switchR xs (mapAwait (box (\_ -> const)) ys)
         state               = prepend zs $ prependLater ys $ flatten intSignals
         predicate           = (Now ((Index First) |==| (Index Third)))
                                 `Until`
                                 ((Now ((Ticked Second) |==| (Pure True)))
                                 `And`
-                                (Next $ Implies
-                                    (Always $ Now ((Ticked Second) |==| (Pure False)))
+                                (Next $ Always $ Implies
+                                    (Now ((Ticked Second) |==| (Pure False)))
                                     (Now ((Index (Previous First)) |==| (Index First)))
-                                    `And`
+                                    `Or`
                                     (Not $ Now ((Index First) |==| (Index (Previous First))))
                                     ))
         result              = evaluate predicate state
-    in result
+    in counterexample (show gg ++ show zs ++ show xs) result
+
+prop_switchS :: Property
+prop_switchS = forAllShrink (generateSignals @Int ) shrinkHls $ \intSignals ->
+    let xs                  = first intSignals
+        gg@(_ ::: ys)          = (scan (box (\n _ -> n + 1)) 0 (takeSigSig (sigLength xs) mkSigZero)) :: Sig Int
+        ggg                 = Delay (IntSet.fromList [1, 2, 3]) (\_ x -> const x)
+        zs                  = switchS xs ggg
+        state               = prepend zs $ prependLater ys $ flatten intSignals
+        predicate           = (Now ((Index First) |==| (Index Third)))
+                                `Until`
+                                ((Now ((Ticked Second) |==| (Pure True)))
+                                `And`
+                                (Next $ Always $ (Now ((Index (Previous First)) |==| (Index First)))))
+        result              = evaluate predicate state
+    in counterexample (show gg ++ show zs ++ show xs) result
 
 prop_sigLength :: Property
 prop_sigLength = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
@@ -217,7 +240,7 @@ prop_sigIsPositive = forAll (generateSignals @Int) $ \sig ->
 prop_catchsubtle :: Property
 prop_catchsubtle = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
         let state   = singletonH (sig :: Sig Int)
-            predicate    = Always $ Implies (Now ((Index First) |>| (Pure 20))) (Next $ (Now ((Index First) |>| (Index (Previous First)))))
+            predicate    = Always $ Implies (Now ((Index First) |>| (Pure 20))) (Next $ (Now ((Index First) |<| (Index (Previous First)))))
             result  = evaluate predicate state
         in result
 
@@ -225,24 +248,27 @@ prop_catchsubtle = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: S
 main :: IO ()
 main = do
     -- examplehls <- generate (generateSignals @[Int, Bool])
-    -- print (shrinkHls examplehls)
-
-    quickCheck prop_interleave
-    quickCheck prop_switchedSignal
-    quickCheck prop_buffer
-    quickCheck prop_zip
-    quickCheck prop_jump
-    quickCheck prop_stop
-    quickCheck prop_scan
-    quickCheck prop_filter
-    quickCheck prop_ticked
-    quickCheck prop_triggerM
-    quickCheck prop_parallel
-    quickCheck prop_isStuttering
-    quickCheck prop_functionIsMonotonic
+    -- print (Prelude.take 5 $ shrinkHls examplehls)
+ 
+    -- quickCheck prop_interleave
+    -- quickCheck prop_switchedSignal
+    -- quickCheck prop_buffer
+    -- quickCheck prop_zip
+    -- quickCheck prop_jump
+    -- quickCheck prop_stop
+    -- quickCheck prop_scan
+    -- quickCheck prop_filter
+    -- quickCheck prop_ticked
+    -- quickCheck prop_triggerM
+    -- quickCheck prop_parallel
+    -- quickCheck prop_isStuttering
+    -- quickCheck prop_functionIsMonotonic
+    -- quickCheck prop_singleSignalAlwaysTicks
+    -- quickCheck prop_firstElement
+    -- quickCheck prop_firstElement2
+    -- quickCheck prop_sigLength
+    -- quickCheck prop_sigIsPositive
+    -- quickCheck prop_catchsubtle
     quickCheck prop_switchR
-    quickCheck prop_singleSignalAlwaysTicks
-    quickCheck prop_firstElement
-    quickCheck prop_sigLength
-    quickCheck prop_sigIsPositive
-    quickCheck prop_catchsubtle
+    quickCheck prop_switchS
+

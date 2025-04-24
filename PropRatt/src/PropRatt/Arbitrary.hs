@@ -150,7 +150,10 @@ class ShrinkHList as where
   shrinkHls :: HList as -> [HList as]
 
 instance ShrinkHList '[] where
-  shrinkHls _ = [HNil]
+  shrinkHls _ = []
 
 instance (Arbitrary a, ShrinkHList as) => ShrinkHList (a ': as) where
-  shrinkHls (HCons x xs) = [ HCons x' xs' | x' <- shrink x, xs' <- shrinkHls xs ]
+  shrinkHls (HCons x xs) = 
+    [ HCons x' xs | x'  <- shrink x ] ++ 
+    [ HCons x xs' | xs' <- shrinkHls xs ] ++
+    [ HCons x' xs' | x'  <- shrink x, xs' <- shrinkHls xs ]

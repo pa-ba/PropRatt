@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - QuickCheck
 - AsyncRattus
+- text
 - containers
 
 ghc-options:
@@ -40,16 +41,28 @@ library:
   source-dirs: src
 
 executables:
-  examples:
-    main:                Main.hs
-    source-dirs:         examples
+  main-example:
+    main: Main.hs
+    source-dirs: examples/main
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
     - PropRatt
-    - deepseq
+    - base
+
+  timer-example:
+    main: Timer.hs
+    source-dirs: examples/timer
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - PropRatt
+    - base
+
 
 tests:
   PropRatt-test:

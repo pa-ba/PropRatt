@@ -1,7 +1,5 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# LANGUAGE GADTs, DataKinds, MultiParamTypeClasses, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
@@ -15,14 +13,11 @@ module PropRatt.LTL
     evaluate,
     Atom (..),
     Lookup (..),
-    SafetyError,
-    SafetyPred,
     (|<|),
     (|<=|),
     (|>|),
     (|>=|),
     (|==|),
-    checkScope,
   )
 where
 
@@ -30,11 +25,10 @@ import AsyncRattus.InternalPrimitives
 import AsyncRattus.Strict
 import AsyncRattus.Signal hiding (const)
 import qualified Data.IntSet as IntSet
-import PropRatt.AsyncRat
 import Data.Kind
 import PropRatt.Value
 import PropRatt.HList
-import PropRatt.Utilities
+import PropRatt.Utils
 
 data Pred (ts :: [Type]) (t :: Type) where
   Tautology     :: Pred ts t
@@ -83,6 +77,7 @@ instance Applicative (Atom ts) where
     (<*>) :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
     Pure f <*> x = fmap f x
     Apply f g <*> x = Apply (Apply f g) x
+    (<*>) _ _ = error "Atom: unsupported constructor for applicative application."
 
 instance Num t => Num (Atom ts t) where
   (+) :: Atom ts t -> Atom ts t -> Atom ts t
@@ -138,34 +133,21 @@ checkPred predicate scope =
   where
     valid s = s >= 0
 
--- Checks that a signal has sufficient amount of elements to be able to check predicate at least once
-isSigValidForPred :: Pred ts t -> Int -> Bool
-isSigValidForPred predicate sigLength = minSigLengthForPred predicate sigLength 0 < sigLength
-
 -- Returns the amount of signal elements needed, to evaluate the predicate at least once
--- Throws an error if predicate tries to evaluate more than 100 timesteps in a single evaluation. 
--- That is ex. using 100 nested Next statements. This is not supported in the language
-minSigLengthForPred :: Pred ts t -> Int -> Int -> Int
-minSigLengthForPred predicate sigLength accSinglePredTimeUsage =
-  if accSinglePredTimeUsage >= 100
-    then error "A single predicate supports at max 100 timesteps usage. Limit your use of after/next"
-  else
+minSigLengthForPred :: Pred ts t -> Int -> Int
+minSigLengthForPred predicate acc =
     case predicate of
-      Tautology       -> accSinglePredTimeUsage
-      Contradiction   -> accSinglePredTimeUsage
-      Now atom        -> accSinglePredTimeUsage
-      Not p           -> minSigLengthForPred p sigLength accSinglePredTimeUsage
-      And p1 p2       -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Or p1 p2        -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Until p1 p2     -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Next p          -> minSigLengthForPred p sigLength (accSinglePredTimeUsage + 1)
-      Implies p1 p2   -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Release p1 p2   -> minSigLengthForPred p1 sigLength accSinglePredTimeUsage + minSigLengthForPred p2 sigLength accSinglePredTimeUsage
-      Always p        -> minSigLengthForPred p sigLength accSinglePredTimeUsage
-      Eventually p    -> minSigLengthForPred p sigLength accSinglePredTimeUsage
-      After n p       -> minSigLengthForPred p sigLength (accSinglePredTimeUsage + n)
-
-
+      Not p           -> minSigLengthForPred p acc
+      And p1 p2       -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Or p1 p2        -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Until p1 p2     -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Next p          -> minSigLengthForPred p (acc + 1)
+      Implies p1 p2   -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Release p1 p2   -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Always p        -> minSigLengthForPred p acc
+      Eventually p    -> minSigLengthForPred p acc
+      After n p       -> minSigLengthForPred p (acc + n)
+      _               -> acc
 
 -- | Propegates the smallest scope found by traversing the atom.
 checkAtom :: Atom ts t -> Int -> Int
@@ -173,14 +155,15 @@ checkAtom atom scope =
   case atom of
     Pure _        -> scope
     Apply fun arg -> min (checkAtom fun scope) (checkAtom arg scope)
-    Index lookup  -> checkLookup lookup scope
+    Index lu      -> checkLookup lu scope
+    Ticked lu     -> checkLookup lu scope
 
 checkLookup :: Lookup ts t -> Int -> Int
-checkLookup lookup scope =
-  case lookup of
-    Previous lookup'  -> checkLookup lookup' (scope - 1)
-    Prior n lookup'   -> checkLookup lookup' (scope - n)
-    _                 -> scope
+checkLookup lu scope =
+  case lu of
+    Previous lu'  -> checkLookup lu' (scope - 1)
+    Prior n lu'   -> checkLookup lu' (scope - n)
+    _             -> scope
 
 nthPrevious :: Int -> Value t -> Maybe' (Value t)
 nthPrevious n curr@(Current b history)
@@ -204,7 +187,7 @@ evalTicked lu hls = case lu of
   Eighth     -> extract $ eighth hls
   Ninth      -> extract $ ninth hls
   where
-    errorTickedPast                   = error "Cannot check if t signal has ticked in the past."
+    errorTickedPast                   = error "Cannot check if signal has ticked in the past."
     extract (Current (HasTicked b) _) = b
 
 evalAtom :: Atom ts t -> HList ts -> Atom ts t
@@ -219,14 +202,14 @@ evalAtom (Ticked lu) hls = pure (evalTicked lu hls)
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
 evalLookup lu hls = case lu of
-  Previous lu ->
-    case evalLookup lu hls of
+  Previous lu' ->
+    case evalLookup lu' hls of
       Just' (Current b history) ->
         case history of
           _ :! xs -> Just' (Current b xs)
           Nil     -> Nothing'
       Nothing' -> Nothing'
-  Prior n lu -> case evalLookup lu hls of
+  Prior n lu'  -> case evalLookup lu' hls of
     Just' v  -> nthPrevious n v
     Nothing' -> Nothing'
   First         -> Just' (first hls)
@@ -241,100 +224,124 @@ evalLookup lu hls = case lu of
 
 evaluate' :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
 evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
-  timestepsLeft <= 0 || case formulae of
-        Tautology       -> True
-        Contradiction   -> False
-        Now atom        ->
-          case evalAtom atom x of
-            Pure b -> b
-            _ -> error "Unexpected error during evaluation" -- unreachable
-        Not phi         -> not (eval phi sig)
-        And phi psi     -> eval phi sig && eval psi sig
-        Or phi psi      -> eval phi sig || eval psi sig
-        Until phi psi   -> eval psi sig
-                           || (eval phi sig && evaluateNext (phi `Until` psi) advance)
-        Next phi        -> evaluateNext phi advance
-        Implies phi psi -> not (eval phi sig && not (eval psi sig))
-        Always phi      -> eval phi sig && evaluateNext (Always phi) advance
-        Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
-                            && not (timestepsLeft == 1 && not (eval phi sig))
-        Release phi psi -> (eval psi sig && eval phi sig)
-                            || (eval psi sig && evaluateNext (phi `Until` psi) advance)
-        After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
-  where
-    evaluateNext = evaluate' (timestepsLeft - 1)
-    eval = evaluate' timestepsLeft
-    smallest = IntSet.findMin
-    advance = f (InputValue (smallest cl) ())
+  if IntSet.null cl 
+    then timestepsLeft <= 0 || case formulae of
+            Tautology       -> True
+            Contradiction   -> False
+            Now atom        ->
+              case evalAtom atom x of
+                Pure b -> b
+                _ -> error "Unexpected error during evaluation."
+            Not phi         -> not (eval phi sig)
+            And phi psi     -> eval phi sig && eval psi sig
+            Or phi psi      -> eval phi sig || eval psi sig
+            Until phi psi   -> eval psi sig || eval phi sig -- eval psi sig -- Very possible wrong???
+            Next phi        -> True
+            Implies phi psi -> not (eval phi sig && not (eval psi sig))
+            Always phi      -> eval phi sig -- && evaluateNext (Always phi) advance
+            Eventually phi  -> eval phi sig  -- || evaluateNext (Eventually phi) advance)
+                               -- && not (timestepsLeft == 1 && not (eval phi sig))
+            Release phi psi -> True -- (eval psi sig && eval phi sig)
+                                -- || (eval psi sig && evaluateNext (phi `Until` psi) advance)
+            After n phi     -> True -- if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
+    else timestepsLeft <= 0 || case formulae of
+            Tautology       -> True
+            Contradiction   -> False
+            Now atom        ->
+              case evalAtom atom x of
+                Pure b -> b
+                _ -> error "Unexpected error during evaluation."
+            Not phi         -> not (eval phi sig)
+            And phi psi     -> eval phi sig && eval psi sig
+            Or phi psi      -> eval phi sig || eval psi sig
+            Until phi psi   -> eval psi sig
+                              || (eval phi sig && evaluateNext (phi `Until` psi) advance)
+            Next phi        -> evaluateNext phi advance
+            Implies phi psi -> not (eval phi sig && not (eval psi sig))
+            Always phi      -> eval phi sig && evaluateNext (Always phi) advance
+            Eventually phi  -> (eval phi sig || evaluateNext (Eventually phi) advance)
+                                && not (timestepsLeft == 1 && not (eval phi sig))
+            Release phi psi -> (eval psi sig && eval phi sig)
+                                || (eval psi sig && evaluateNext (phi `Until` psi) advance)
+            After n phi     -> if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
+      where
+        evaluateNext = evaluate' (timestepsLeft - 1)
+        eval = evaluate' timestepsLeft
+        -- When having an Always, on a signal with only 1 element, we try to advance on the empty clock. 
+        -- We might need to refactor this, to have a check for null clock before advancing, and maybe just passing the test if clock is null
+        advance = f (InputValue (IntSet.findMin cl) ())
 
 
--- Create checker function to check pred for minimum amount of timesteps. Pass test, if min is larger than sig length.
--- It should pass, such that the shrinker continues evaluating larger signals. 
--- Argument for passing the test is equivalent to returning true from an eventually pred that might not evaluate to true in the future but is limited by the amount that we can check
--- CheckPredicateMinimumTimestepsToEvaluate (returns true if pred needs more timesteps than length of sig) || (OR) evaluate pred
+-- Shrinking is iteratively. Start by cutting length in half. Then later on do it on element level
+-- Copy code from widgetrattus example and test it within our project here.
+-- Find properties that dont hold. 
+-- Pick reasonable default arbitrary signal length. and then be able to set your own length
+-- PBT = testing how a program should behave instead of coverage
 
--- Next up; Shrink individual elements
 
+-- Is the signal too short? Then Pass the test (this is only for the shrinker to avoid evaluating and advancing on signals with no clocks/no later values)
+-- Passing the test, when signal is too short, will not be reached in a passing test, as arbitrary signals are of a hardcoded length (e.g. 100). 
+-- (Unless you provide a predicate that checks more than 100 timesteps, which is considered a user error)
+-- 
 evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
-evaluate pred sigHls =
-  let halfLength = sigLength sigHls `div` 2
-      validSigLengthForPred = isSigValidForPred pred halfLength
-  in
-    (not validSigLengthForPred || (let minLength = minSigLengthForPred pred halfLength 0
-                                   in evaluate' (2 `max` 20) pred sigHls))
-    -- Pass test, to make shrinker move to larger signals, for better failed test prints
+evaluate p sig =
+  let len       = sigLength sig
+      -- Find the minimum length that a signal must have, in order for the pred to be tested.
+      min'      = minSigLengthForPred p 1
+  in if min' > 100 then error "Predicate must not check more than 100 timesteps in a single predicate" else
+  let tooShort  = len < min'
+      scopeOk   = checkScope p
+  in scopeOk && (tooShort || evaluate' (min' `max` len) p sig)
 
--------------------------------
+-- isSafetyPredicate :: Pred ts t -> Bool
+-- isSafetyPredicate Tautology       = True
+-- isSafetyPredicate Contradiction   = True
+-- isSafetyPredicate (Now _)         = True
+-- isSafetyPredicate (Not p)         = isSafetyPredicate p
+-- isSafetyPredicate (And q p)       = isSafetyPredicate q && isSafetyPredicate p
+-- isSafetyPredicate (Or q p)        = isSafetyPredicate q && isSafetyPredicate p
+-- isSafetyPredicate (Next p)        = isSafetyPredicate p
+-- isSafetyPredicate (Implies q p)   = isSafetyPredicate q && isSafetyPredicate p
+-- isSafetyPredicate (After _ p)     = isSafetyPredicate p
+-- isSafetyPredicate (Until _ _)     = False
+-- isSafetyPredicate (Always _ )     = False
+-- isSafetyPredicate (Eventually _ ) = False
+-- isSafetyPredicate (Release _ _)   = False
 
-isSafetyPredicate :: Pred ts t -> Bool
-isSafetyPredicate Tautology       = True
-isSafetyPredicate Contradiction   = True
-isSafetyPredicate (Now _)         = True
-isSafetyPredicate (Not p)         = isSafetyPredicate p
-isSafetyPredicate (And q p)       = isSafetyPredicate q && isSafetyPredicate p
-isSafetyPredicate (Or q p)        = isSafetyPredicate q || isSafetyPredicate p
-isSafetyPredicate (Next p)        = isSafetyPredicate p
-isSafetyPredicate (Implies q p)   = isSafetyPredicate q && isSafetyPredicate p
-isSafetyPredicate (After _ p)     = isSafetyPredicate p
-isSafetyPredicate (Until _ _)     = False
-isSafetyPredicate (Always _ )     = False
-isSafetyPredicate (Eventually _ ) = False
-isSafetyPredicate (Release _ _)   = False
+-- type SafetyPred ts t = Either SafetyError (Pred ts t)
 
-type SafetyPred ts t = Either SafetyError (Pred ts t)
+-- newtype SafetyError = SafetyError String
 
-newtype SafetyError = SafetyError String
+-- mkSafePred :: Pred ts t -> SafetyPred ts t
+-- mkSafePred p
+--   | isSafetyPredicate p = Right p
+--   | otherwise = Left $ SafetyError "Predicate is t safety property."
 
-mkSafePred :: Pred ts t -> SafetyPred ts t
-mkSafePred p
-  | isSafetyPredicate p = Right p
-  | otherwise = Left $ SafetyError "Predicate is t safety property."
+-- mkBinaryOp :: (Pred ts t -> Pred ts t -> Pred ts t) -> Pred ts t -> Pred ts t -> SafetyPred ts t
+-- mkBinaryOp op p q = do
+--   p' <- mkSafePred p
+--   q' <- mkSafePred q
+--   return (op p' q')
 
-mkBinaryOp :: (Pred ts t -> Pred ts t -> Pred ts t) -> Pred ts t -> Pred ts t -> SafetyPred ts t
-mkBinaryOp op p q = do
-  p' <- mkSafePred p
-  q' <- mkSafePred q
-  return (op p' q')
+-- mkAnd, mkOr, mkImplies :: Pred ts t -> Pred ts t -> SafetyPred ts t
+-- mkAnd = mkBinaryOp And
+-- mkOr = mkBinaryOp Or
+-- mkImplies = mkBinaryOp Implies
 
-mkAnd, mkOr, mkImplies :: Pred ts t -> Pred ts t -> SafetyPred ts t
-mkAnd = mkBinaryOp And
-mkOr = mkBinaryOp Or
-mkImplies = mkBinaryOp Implies
+-- mkUnaryOp :: (Pred ts t -> Pred ts t) -> Pred ts t -> SafetyPred ts t
+-- mkUnaryOp op = mkSafePred . op
 
-mkUnaryOp :: (Pred ts t -> Pred ts t) -> Pred ts t -> SafetyPred ts t
-mkUnaryOp op = mkSafePred . op
+-- mkNext, mkNow, mkTautology, mkContradiction :: Pred ts t -> SafetyPred ts t
+-- mkNext = mkUnaryOp id
+-- mkNow = mkUnaryOp id
+-- mkTautology = mkUnaryOp id
+-- mkContradiction = mkUnaryOp id
 
-mkNext, mkNow, mkTautology, mkContradiction :: Pred ts t -> SafetyPred ts t
-mkNext = mkUnaryOp id
-mkNow = mkUnaryOp id
-mkTautology = mkUnaryOp id
-mkContradiction = mkUnaryOp id
+-- mkLivenessOp :: String -> Pred ts t -> SafetyPred ts t
+-- mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in safety property.")
 
-mkLivenessOp :: String -> Pred ts t -> SafetyPred ts t
-mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in t safety property.")
-
-mkAlways, mkUntil, mkEventually, mkRelease :: Pred ts t -> SafetyPred ts t
-mkAlways = mkLivenessOp "Always"
-mkUntil = mkLivenessOp "Until"
-mkEventually = mkLivenessOp "Eventually"
-mkRelease = mkLivenessOp "Release"
+-- mkAlways, mkUntil, mkEventually, mkRelease :: Pred ts t -> SafetyPred ts t
+-- mkAlways = mkLivenessOp "Always"
+-- mkUntil = mkLivenessOp "Until"
+-- mkEventually = mkLivenessOp "Eventually"
+-- mkRelease = mkLivenessOp "Release"

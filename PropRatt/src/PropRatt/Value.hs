@@ -5,24 +5,19 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables, UndecidableInstances #-}
-{-# LANGUAGE InstanceSigs #-}
 
 module PropRatt.Value where
 import AsyncRattus.Strict
 import AsyncRattus.Signal hiding (current)
-import PropRatt.Utilities
+import PropRatt.Utils
 import AsyncRattus
-
-instance Stable (Value a) where 
-instance Stable Int where 
-
 
 newtype HasTicked = HasTicked Bool deriving Show
 
--- make value a functor?
 data Value a where
   Current :: !HasTicked -> !(List a) -> Value a
 
+instance Stable (Value a) where 
 instance Num a => Num (Value a) where
   (+) v1 v2 = pureVal (current v1 + current v2)
   (-) v1 v2 = pureVal (current v1 - current v2)
@@ -31,9 +26,6 @@ instance Num a => Num (Value a) where
   abs v     = pureVal (abs (current v))
   signum v  = pureVal (signum (current v))
   fromInteger n = pureVal (fromInteger n)
-
-pureVal :: a -> Value a
-pureVal x = Current (HasTicked False) (x :! Nil)
 
 instance Show a => Show (Value a) where
   show (Current t Nil) = show t
@@ -49,16 +41,9 @@ instance Ord a => Ord (Value a) where
 instance Eq a => Eq (Value a) where
   v1 == v2 = current v1 == current v2
 
+pureVal :: a -> Value a
+pureVal x = Current (HasTicked False) (x :! Nil)
+
 current :: Value a -> a
 current (Current _ (h :! _)) = h
 current _ = undefined
-
-previous :: Value a -> a
-previous (Current _ (_ :! Nil)) = undefined
-previous (Current _ Nil) = undefined
-previous (Current _ (_ :! y :! _)) = y
-
-past :: Int -> Value a -> a
-past _ (Current _ Nil) = undefined
-past 0 (Current _ (h :! _)) = h 
-past n (Current a (_ :! t)) = past (n-1) (Current a t)

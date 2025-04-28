@@ -189,21 +189,16 @@ prop_firstElement2 = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \intSign
 
 -- Switched signal equals XS until YS has ticked, from then on the value is constant assuming ys has not produced another const signal
 prop_switchR :: Property
-prop_switchR = forAllShrink (generateSignals @Int ) shrinkHls $ \intSignals ->
+prop_switchR = forAllShrink (generateSignals @Int) shrinkHls $ \intSignals ->
     let xs                  = first intSignals
         gg@(_ ::: ys)       = (scan (box (\n _ -> n + 1)) 0 (takeSigSig (sigLength xs) mkSigZero)) :: Sig Int
         zs                  = switchR xs (mapAwait (box (\_ -> const)) ys)
         state               = prepend zs $ prependLater ys $ flatten intSignals
-        predicate           = (Now ((Index First) |==| (Index Third)))
+        predicate           =  (Now ((Index First) |==| (Index Third)))
                                 `Until`
                                 ((Now ((Ticked Second) |==| (Pure True)))
                                 `And`
-                                (Next $ Always $ Implies
-                                    (Now ((Ticked Second) |==| (Pure False)))
-                                    (Now ((Index (Previous First)) |==| (Index First)))
-                                    `Or`
-                                    (Not $ Now ((Index First) |==| (Index (Previous First))))
-                                    ))
+                                (Next $ Always $ (Now ((Index (Previous First)) |==| (Index First)))))
         result              = evaluate predicate state
     in counterexample (show gg ++ show zs ++ show xs) result
 
@@ -240,7 +235,7 @@ prop_sigIsPositive = forAll (generateSignals @Int) $ \sig ->
 prop_catchsubtle :: Property
 prop_catchsubtle = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
         let state   = singletonH (sig :: Sig Int)
-            predicate    = Always $ Implies (Now ((Index First) |>| (Pure 20))) (Next $ (Now ((Index First) |<| (Index (Previous First)))))
+            predicate    = Always $ Implies (Now ((Index First) |>| (Pure 80))) (Next $ (Now ((Index First) |<| (Index (Previous First)))))
             result  = evaluate predicate state
         in result
 
@@ -250,25 +245,25 @@ main = do
     -- examplehls <- generate (generateSignals @[Int, Bool])
     -- print (Prelude.take 5 $ shrinkHls examplehls)
  
-    -- quickCheck prop_interleave
-    -- quickCheck prop_switchedSignal
-    -- quickCheck prop_buffer
-    -- quickCheck prop_zip
-    -- quickCheck prop_jump
-    -- quickCheck prop_stop
-    -- quickCheck prop_scan
-    -- quickCheck prop_filter
-    -- quickCheck prop_ticked
-    -- quickCheck prop_triggerM
-    -- quickCheck prop_parallel
-    -- quickCheck prop_isStuttering
-    -- quickCheck prop_functionIsMonotonic
-    -- quickCheck prop_singleSignalAlwaysTicks
-    -- quickCheck prop_firstElement
-    -- quickCheck prop_firstElement2
-    -- quickCheck prop_sigLength
-    -- quickCheck prop_sigIsPositive
-    -- quickCheck prop_catchsubtle
+    quickCheck prop_interleave
+    quickCheck prop_switchedSignal
+    quickCheck prop_buffer
+    quickCheck prop_zip
+    quickCheck prop_jump
+    quickCheck prop_stop
+    quickCheck prop_scan
+    quickCheck prop_filter
+    quickCheck prop_ticked
+    quickCheck prop_triggerM
+    quickCheck prop_parallel
+    quickCheck prop_isStuttering
+    quickCheck prop_functionIsMonotonic
+    quickCheck prop_singleSignalAlwaysTicks
+    quickCheck prop_firstElement
+    quickCheck prop_firstElement2
+    quickCheck prop_sigLength
+    quickCheck prop_sigIsPositive
+    quickCheck prop_catchsubtle
     quickCheck prop_switchR
     quickCheck prop_switchS
 

@@ -38,13 +38,15 @@ import qualified Data.IntSet as IntSet
 import PropRatt.Utils
 import Data.Kind (Type)
 import Test.QuickCheck
-import Prelude hiding (const, drop, take)
+import Prelude hiding (const)
 import PropRatt.HList
+
+type TSig a = [(a, IntSet.IntSet)]
 
 instance (Arbitrary a) => Arbitrary (Sig a) where
   arbitrary = arbitrarySig 100
   shrink :: Sig a -> [Sig a]
-  shrink = shrinkSignal shrink
+  shrink sig = toSignal (shrinkSignal shrink sig) 
 
 instance (Show a) => Show (Sig a) where
   show (x ::: xs) = show (toList (x ::: xs))
@@ -52,49 +54,51 @@ instance (Show a) => Show (Sig a) where
 instance (Eq a) => Eq (Sig a) where
   (==) sig1 sig2 = toList sig1 == toList sig2
 
-
-shrinkSignal :: (a -> [a]) -> Sig a -> [Sig a]
-shrinkSignal shr sig@(y ::: ys@(Delay cly fy))
-  | IntSet.null cly = shrinkOne sig shr
-  | otherwise = concat [ removes k n sig | k <- takeWhile (>0) (iterate (`div`2) n) ]
-    ++ shrinkOne sig shr
+shrinkSignal :: (a -> [a]) -> Sig a -> [TSig a]
+shrinkSignal shr sig@(_ ::: (Delay cly _)) =
+  if IntSet.null cly
+    then shrinkOne tupleList shr
+    else concat [ removes k n tupleList | k <- takeWhile (>0) (iterate (`div`2) n) ]
+    ++ shrinkOne tupleList shr
   where
     n = sigLength sig
+    tupleList = sigToTupleList sig
 
 
 {-# ANN shrinkOne AllowRecursion #-}
-shrinkOne :: Sig a -> (a -> [a]) -> [Sig a]
-shrinkOne (x ::: xs@(Delay cl f)) shr
-  | IntSet.null cl = [ x' ::: xs | x'  <- shr x ]
-  | otherwise = [ x' ::: xs | x'  <- shr x ]
-                ++ [ x ::: Delay cl (\_ -> xs') | xs' <- (shrinkOne (f (InputValue (IntSet.findMin cl) ())) shr) ]
+shrinkOne :: TSig a -> (a -> [a]) -> [TSig a]
+shrinkOne ((x, cl) : []) shr = [ (x', cl) : [] | x'  <- shr x ]
+shrinkOne ((x, cl) : xs) shr = [ (x', cl) : xs | x'  <- shr x ] ++ [ (x, cl) : xs' | xs' <- (shrinkOne xs shr) ]
 
 {-# ANN removes AllowRecursion #-}
-removes :: Int -> Int -> Sig a -> [Sig a]
-removes k n sig =
+removes :: Int -> Int -> TSig a -> [TSig a]
+removes k n tupleLs =
   if k >= n
     then []
-    else let xs1 = take k sig
-             xs2 = drop k sig
-         in xs1 : xs2 : map (append xs1) (removes k (n-k) xs2)
+    else let xs1 = take k tupleLs
+             xs2 = drop k tupleLs
+         in xs1 : xs2 : map (xs1 ++) (removes k (n-k) xs2)
 
-{-# ANN take AllowRecursion #-}
-take :: Int -> Sig a -> Sig a
-take 1 (x ::: _)    = x ::: never
-take k (x ::: xs)   = x ::: delay (take (k-1) (adv xs))
+{-# ANN toSignal AllowRecursion #-}
+toSignal :: [TSig a] -> [Sig a]
+toSignal [] = []
+toSignal (x : []) = [tupleListToSig x]
+toSignal (x : xs) = tupleListToSig x : toSignal xs
 
-{-# ANN drop AllowRecursion #-}
-drop :: Int -> Sig a -> Sig a
-drop n sig@(x ::: (Delay cl f))
-  | n <= 0    = sig
-  | otherwise = drop (n-1) (f (InputValue (IntSet.findMin cl) ()))
+{-# ANN tupleListToSig AllowRecursion #-}
+tupleListToSig :: TSig a -> Sig a
+tupleListToSig ((x, cl) : []) = x ::: never
+tupleListToSig ((x, cl) : xs) = 
+  if IntSet.null cl 
+    then x ::: never 
+    else x ::: Delay cl (\_ -> tupleListToSig xs)
 
-{-# ANN append AllowRecursion #-}
-append :: Sig a -> Sig a -> Sig a
-append (x ::: xs@(Delay cl fx)) y
-  | IntSet.null cl = x ::: Delay (IntSet.fromList [1,2,3]) (\_ -> (y))
-  | otherwise      = x ::: Delay cl (\_ -> append (fx (InputValue (IntSet.findMin cl) ())) y)
-
+{-# ANN sigToTupleList AllowRecursion #-}
+sigToTupleList :: Sig a -> TSig a
+sigToTupleList (x ::: (Delay cl f)) =
+  if IntSet.null cl 
+    then [(x, IntSet.empty)] 
+    else (x, cl) : sigToTupleList (f (InputValue (IntSet.findMin cl) ())) 
 
 genClockChannel :: Gen Int
 genClockChannel = chooseInt (1, 3)

@@ -222,10 +222,9 @@ evalLookup lu hls = case lu of
   Eighth        -> Just' (eighth hls)
   Ninth         -> Just' (ninth hls)
 
-evaluate' :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
-evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
-  if IntSet.null cl 
-    then timestepsLeft <= 0 || case formulae of
+evaluateSingle  :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
+evaluateSingle timestepsLeft formulae sig@(x ::: Delay cl f) =
+  timestepsLeft <= 0 || case formulae of
             Tautology       -> True
             Contradiction   -> False
             Now atom        ->
@@ -235,15 +234,20 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
             Not phi         -> not (eval phi sig)
             And phi psi     -> eval phi sig && eval psi sig
             Or phi psi      -> eval phi sig || eval psi sig
-            Until phi psi   -> eval psi sig || eval phi sig -- eval psi sig -- Very possible wrong???
+            Until phi psi   -> eval psi sig || eval phi sig
             Next phi        -> True
             Implies phi psi -> not (eval phi sig && not (eval psi sig))
-            Always phi      -> eval phi sig -- && evaluateNext (Always phi) advance
-            Eventually phi  -> eval phi sig  -- || evaluateNext (Eventually phi) advance)
-                               -- && not (timestepsLeft == 1 && not (eval phi sig))
-            Release phi psi -> True -- (eval psi sig && eval phi sig)
-                                -- || (eval psi sig && evaluateNext (phi `Until` psi) advance)
-            After n phi     -> True -- if n <= 0 then eval phi sig else evaluateNext (After (n - 1) phi) sig
+            Always phi      -> eval phi sig
+            Eventually phi  -> eval phi sig 
+            Release phi psi -> True 
+            After n phi     -> True
+        where
+          eval = evaluateSingle timestepsLeft
+
+evaluate' :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
+evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
+  if IntSet.null cl 
+    then evaluateSingle timestepsLeft formulae sig
     else timestepsLeft <= 0 || case formulae of
             Tautology       -> True
             Contradiction   -> False
@@ -267,81 +271,13 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
       where
         evaluateNext = evaluate' (timestepsLeft - 1)
         eval = evaluate' timestepsLeft
-        -- When having an Always, on a signal with only 1 element, we try to advance on the empty clock. 
-        -- We might need to refactor this, to have a check for null clock before advancing, and maybe just passing the test if clock is null
         advance = f (InputValue (IntSet.findMin cl) ())
 
-
--- Shrinking is iteratively. Start by cutting length in half. Then later on do it on element level
--- Copy code from widgetrattus example and test it within our project here.
--- Find properties that dont hold. 
--- Pick reasonable default arbitrary signal length. and then be able to set your own length
--- PBT = testing how a program should behave instead of coverage
-
-
--- Is the signal too short? Then Pass the test (this is only for the shrinker to avoid evaluating and advancing on signals with no clocks/no later values)
--- Passing the test, when signal is too short, will not be reached in a passing test, as arbitrary signals are of a hardcoded length (e.g. 100). 
--- (Unless you provide a predicate that checks more than 100 timesteps, which is considered a user error)
--- 
 evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
 evaluate p sig =
   let len       = sigLength sig
       -- Find the minimum length that a signal must have, in order for the pred to be tested.
       min'      = minSigLengthForPred p 1
-  in if min' > 100 then error "Predicate must not check more than 100 timesteps in a single predicate" else
-  let tooShort  = len < min'
+      tooShort  = len < min'
       scopeOk   = checkScope p
-  in scopeOk && (tooShort || evaluate' (min' `max` len) p sig)
-
--- isSafetyPredicate :: Pred ts t -> Bool
--- isSafetyPredicate Tautology       = True
--- isSafetyPredicate Contradiction   = True
--- isSafetyPredicate (Now _)         = True
--- isSafetyPredicate (Not p)         = isSafetyPredicate p
--- isSafetyPredicate (And q p)       = isSafetyPredicate q && isSafetyPredicate p
--- isSafetyPredicate (Or q p)        = isSafetyPredicate q && isSafetyPredicate p
--- isSafetyPredicate (Next p)        = isSafetyPredicate p
--- isSafetyPredicate (Implies q p)   = isSafetyPredicate q && isSafetyPredicate p
--- isSafetyPredicate (After _ p)     = isSafetyPredicate p
--- isSafetyPredicate (Until _ _)     = False
--- isSafetyPredicate (Always _ )     = False
--- isSafetyPredicate (Eventually _ ) = False
--- isSafetyPredicate (Release _ _)   = False
-
--- type SafetyPred ts t = Either SafetyError (Pred ts t)
-
--- newtype SafetyError = SafetyError String
-
--- mkSafePred :: Pred ts t -> SafetyPred ts t
--- mkSafePred p
---   | isSafetyPredicate p = Right p
---   | otherwise = Left $ SafetyError "Predicate is t safety property."
-
--- mkBinaryOp :: (Pred ts t -> Pred ts t -> Pred ts t) -> Pred ts t -> Pred ts t -> SafetyPred ts t
--- mkBinaryOp op p q = do
---   p' <- mkSafePred p
---   q' <- mkSafePred q
---   return (op p' q')
-
--- mkAnd, mkOr, mkImplies :: Pred ts t -> Pred ts t -> SafetyPred ts t
--- mkAnd = mkBinaryOp And
--- mkOr = mkBinaryOp Or
--- mkImplies = mkBinaryOp Implies
-
--- mkUnaryOp :: (Pred ts t -> Pred ts t) -> Pred ts t -> SafetyPred ts t
--- mkUnaryOp op = mkSafePred . op
-
--- mkNext, mkNow, mkTautology, mkContradiction :: Pred ts t -> SafetyPred ts t
--- mkNext = mkUnaryOp id
--- mkNow = mkUnaryOp id
--- mkTautology = mkUnaryOp id
--- mkContradiction = mkUnaryOp id
-
--- mkLivenessOp :: String -> Pred ts t -> SafetyPred ts t
--- mkLivenessOp op _ = Left $ SafetyError ("The '" ++ op ++ "' operator cannot be constructed in safety property.")
-
--- mkAlways, mkUntil, mkEventually, mkRelease :: Pred ts t -> SafetyPred ts t
--- mkAlways = mkLivenessOp "Always"
--- mkUntil = mkLivenessOp "Until"
--- mkEventually = mkLivenessOp "Eventually"
--- mkRelease = mkLivenessOp "Release"
+  in scopeOk && (tooShort || evaluate' (100 `min` len) p sig)

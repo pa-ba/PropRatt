@@ -18,6 +18,8 @@
 
 module PropRatt.Arbitrary
   ( arbitrarySig,
+    arbitrarySigWith,
+    arbitrarySigWeighted,
     Sig (..),
     generateSignals,
     Map,
@@ -101,12 +103,18 @@ sigToTupleList (x ::: (Delay cl f)) =
     else (x, cl) : sigToTupleList (f (InputValue (IntSet.findMin cl) ())) 
 
 genClockChannel :: Gen Int
-genClockChannel = chooseInt (1, 3)
+genClockChannel = chooseInt (9, 11)
+
+genClockChannelWeighted :: Gen Int
+genClockChannelWeighted = frequency [(1, pure 9), (1, pure 10), (50, pure 11)]
 
 genClockList :: Gen [Int]
 genClockList = do
   len <- chooseInt (1, 3)
   vectorOf len genClockChannel
+
+genClockListWeighted :: Gen [Int]
+genClockListWeighted = vectorOf 1 genClockChannelWeighted
 
 {-# ANN arbitrarySig AllowRecursion #-}
 arbitrarySig :: (Arbitrary a) => Int -> Gen (Sig a)
@@ -122,6 +130,42 @@ arbitrarySig n = do
         go m = do
           x <- arbitrary
           cl <- genClockList
+          xs <- go (m - 1)
+          let later = Delay (IntSet.fromList cl) (\_ -> xs)
+          return (x ::: later)
+
+{-# ANN arbitrarySigWith AllowRecursion #-}
+arbitrarySigWith :: (Arbitrary a) => Int -> Gen a -> Gen (Sig a)
+arbitrarySigWith n gen = do
+  if n <= 0
+    then error "Cannot create empty signals"
+    else
+      go n
+      where
+        go 1 = do
+          x <- gen
+          return (x ::: never)
+        go m = do
+          x <- gen
+          cl <- genClockList
+          xs <- go (m - 1)
+          let later = Delay (IntSet.fromList cl) (\_ -> xs)
+          return (x ::: later)
+
+{-# ANN arbitrarySigWeighted AllowRecursion #-}
+arbitrarySigWeighted :: (Arbitrary a) => Int -> Gen (Sig a)
+arbitrarySigWeighted n = do
+  if n <= 0
+    then error "Cannot create empty signals"
+    else
+      go n
+      where
+        go 1 = do
+          x <- arbitrary
+          return (x ::: never)
+        go m = do
+          x <- arbitrary
+          cl <- genClockListWeighted
           xs <- go (m - 1)
           let later = Delay (IntSet.fromList cl) (\_ -> xs)
           return (x ::: later)

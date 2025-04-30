@@ -18,10 +18,9 @@ import AsyncRattus.Channels
 import AsyncRattus.Signal
 import AsyncRattus.InternalPrimitives
 import Prelude hiding (map, const, zipWith, zip, filter, getLine, putStrLn,null)
-import Data.Text hiding (filter, map, all)
 
 everySecondSig :: O (Sig ())
-everySecondSig = mkSig (timer 1000000)
+everySecondSig = mkSig (timer 10)
 
 nats :: (Int :* Int) -> Sig (Int :* Int)
 nats (n :* max) = stop
@@ -47,77 +46,106 @@ timerState resetSig@(r ::: rr) sliderSig@(s ::: ss) =
     in counterSig
 
 prop_alwaysLessThanMax :: Property
-prop_alwaysLessThanMax = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
-        let absSig      = map (box abs) (second sig)
-            counterSig  = timerState (first sig) absSig
-            state       = prepend counterSig $ flatten sig
+prop_alwaysLessThanMax = forAll genDouble $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ singletonH slider
             predicate   = Always $ Now ((fst' <$> Index First) |<=| (snd' <$> Index First))
             result      = evaluate predicate state 
-        in result
+        in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0,100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      return (reset, slider)
 
+-- The max value of the counter signal always equals the slider signal
 prop_alwaysEqualsMax :: Property
-prop_alwaysEqualsMax = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
-        let absSig      = map (box abs) (second sig)
-            counterSig  = timerState (first sig) absSig
-            state       = prepend counterSig $ flatten sig
+prop_alwaysEqualsMax = forAll genDouble $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ singletonH slider
             predicate   = Always $ Now ((abs <$> (Index Third)) |==| (snd' <$> Index First))
             result      = evaluate predicate state 
-        in result
+        in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0,100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      return (reset, slider)
+
 
 -- Concurrently resetting and dragging slider yields reset signal with max value from slider
 prop_resetAndSlider :: Property
-prop_resetAndSlider = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
-        let absSig      = map (box abs) (second sig)
-            counterSig  = timerState (first sig) absSig
-            state       = prepend counterSig $ flatten sig
-            predicate   = Always $ Implies 
+prop_resetAndSlider = forAll genDouble $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ singletonH slider
+            predicate   =Always $ Implies 
                 (And (Now ((Ticked Second))) (Now ((Ticked Third)))) 
-                ((Now ((abs <$> (Index Third)) |==| (snd' <$> Index First)))
+                ((Now (((Index Third)) |==| (snd' <$> Index First)))
                 `And`
                 (Now ((Pure 0) |==| (fst' <$> Index First))))
             result      = evaluate predicate state 
-        in result
+        in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0,100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      return (reset, slider)
+
 
 prop_timerIsStrictlyMonotonicallyIncreasing :: Property
-prop_timerIsStrictlyMonotonicallyIncreasing = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
-        let absSig      = map (box abs) (second sig)
-            counterSig  = timerState (first sig) absSig
-            state       = prepend counterSig $ flatten sig
-            predicate   = Always $ Next $ 
+prop_timerIsStrictlyMonotonicallyIncreasing = forAll genDouble $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ singletonH slider
+            predicate   =Always $ Next $ 
                 Implies 
                 ((Now (Ticked First)) `And` ((Not (Now (Ticked Second)) `And` (Not (Now (Ticked Third))))))
                 (Now (((fst' <$> (Index First)) |>| (fst' <$> (Index (Previous First))))))
             result      = evaluate predicate state 
         in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0,100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      return (reset, slider)
 
-prop_initial_state :: Property
-prop_initial_state = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
-        let absSig      = map (box abs) (second sig)
-            counterSig  = timerState (first sig) absSig
-            state       = prepend counterSig $ flatten sig
-            predicate   = Now ((fst' <$> (Index First)) |==| (Pure 0)) `And` (Now ((snd' <$> (Index First)) |==| (abs <$> (Index Third))))
+-- The initial state is set correctly
+prop_init :: Property
+prop_init = forAll genDouble $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ singletonH slider
+            predicate   = Now ((fst' <$> (Index First)) |==| (Pure 0)) `And` (Now ((snd' <$> (Index First)) |==| (Index Third)))
             result      = evaluate predicate state 
         in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0,100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      return (reset, slider)
 
-prop_max_stutter :: Property
-prop_max_stutter = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
-        let absSig      = map (box abs) (second sig)
-            counterSig  = timerState (first sig) absSig
-            state       = prepend counterSig $ flatten sig
+-- If the counter signal hits the max value it remains at the max value until the slider is moved.
+prop_counterSigStaysAtMaxValue :: Property
+prop_counterSigStaysAtMaxValue = forAllShrink genDouble shrink $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ singletonH slider
             predicate   = Always $ 
                 Implies 
-                    (Now ((fst' <$> (Index First)) |==| (snd' <$> (Index First))))                            -- if counter hits max value
-                    ((Next (Now ((fst' <$> (Index First)) |==| (fst' <$> (Index (Previous First))))))         -- it stays there until slider is moved
+                    (Now ((fst' <$> (Index First)) |==| (snd' <$> (Index First))))                 
+                    (Next $ (((Now ((fst' <$> (Index First)) |==| (fst' <$> (Index (Previous First))))))        
                     `Until`
-                    (Now (Ticked Second)))
+                    ((Now (Ticked Second)) `Or` (Now (Ticked Third)))))
             result      = evaluate predicate state 
         in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0,100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      return (reset, slider)
 
 main :: IO ()
 main = do
-    -- quickCheck prop_alwaysLessThanMax
-    -- quickCheck prop_alwaysEqualsMax
-    -- quickCheck prop_resetAndSlider
-    -- quickCheck prop_timerIsStrictlyMonotonicallyIncreasing
-    -- quickCheck prop_initial_state
-    quickCheck prop_max_stutter
+    quickCheck prop_alwaysLessThanMax
+    quickCheck prop_alwaysEqualsMax
+    quickCheck prop_resetAndSlider
+    quickCheck prop_timerIsStrictlyMonotonicallyIncreasing
+    quickCheck prop_init
+    quickCheck prop_counterSigStaysAtMaxValue

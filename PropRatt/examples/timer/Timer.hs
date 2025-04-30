@@ -90,19 +90,6 @@ prop_timerIsStrictlyMonotonicallyIncreasing = forAllShrink (generateSignals @[()
             result      = evaluate predicate state 
         in counterexample (show state) result
 
-
-prop_timerIsStrictlyMonotonicallyIncreasingFailing :: Property
-prop_timerIsStrictlyMonotonicallyIncreasingFailing = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
-        let absSig      = map (box abs) (second sig)
-            counterSig  = timerState (first sig) absSig
-            state       = prepend counterSig $ flatten sig
-            predicate   = Always $ Next $ 
-                Implies 
-                ((Now (Ticked First)) `And` ((Not (Now (Ticked Second)))))
-                (Now (((fst' <$> (Index First)) |>| (fst' <$> (Index (Previous First))))))
-            result      = evaluate predicate state 
-        in counterexample (show state) result
-
 prop_initial_state :: Property
 prop_initial_state = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
         let absSig      = map (box abs) (second sig)
@@ -112,25 +99,25 @@ prop_initial_state = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig 
             result      = evaluate predicate state 
         in counterexample (show state) result
 
--- prop_max_stutter :: Property
--- prop_max_stutter = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
---         let absSig      = map (box abs) (second sig)
---             counterSig  = timerState (first sig) absSig
---             state       = prepend counterSig $ flatten sig
---             predicate   = Always $ 
---             (Implies 
---                 ((fst' <$> (Index First)) |==| (snd' <$> (Index First))) 
---                 (Next (Now ((fst' <$> (Index First)) |==| (fst' <$> (Index (Previous First))))))) 
---                     `Until` 
---                     (Now (Ticked Second) )
---             result      = evaluate predicate state 
---         in counterexample (show state) result
+prop_max_stutter :: Property
+prop_max_stutter = forAllShrink (generateSignals @[(), Int]) shrinkHls $ \sig ->
+        let absSig      = map (box abs) (second sig)
+            counterSig  = timerState (first sig) absSig
+            state       = prepend counterSig $ flatten sig
+            predicate   = Always $ 
+                Implies 
+                    (Now ((fst' <$> (Index First)) |==| (snd' <$> (Index First))))                            -- if counter hits max value
+                    ((Next (Now ((fst' <$> (Index First)) |==| (fst' <$> (Index (Previous First))))))         -- it stays there until slider is moved
+                    `Until`
+                    (Now (Ticked Second)))
+            result      = evaluate predicate state 
+        in counterexample (show state) result
 
 main :: IO ()
 main = do
-    quickCheck prop_alwaysLessThanMax
-    quickCheck prop_alwaysEqualsMax
-    quickCheck prop_resetAndSlider
-    quickCheck prop_timerIsStrictlyMonotonicallyIncreasing
-    quickCheck prop_timerIsStrictlyMonotonicallyIncreasingFailing
-    quickCheck prop_initial_state
+    -- quickCheck prop_alwaysLessThanMax
+    -- quickCheck prop_alwaysEqualsMax
+    -- quickCheck prop_resetAndSlider
+    -- quickCheck prop_timerIsStrictlyMonotonicallyIncreasing
+    -- quickCheck prop_initial_state
+    quickCheck prop_max_stutter

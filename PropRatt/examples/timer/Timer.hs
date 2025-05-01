@@ -25,10 +25,10 @@ import AsyncRattus.Plugin.Annotation
 everySecondSig :: O (Sig ())
 everySecondSig = Delay (IntSet.fromList [7]) (\_ -> () ::: everySecondSig) 
 
-nats :: (Int :* Int) -> Sig (Int :* Int)
-nats (n :* max) = stop
+nats :: O (Sig ()) -> (Int :* Int) -> Sig (Int :* Int)
+nats later (n :* max) = stop
     (box (\ (n :* max) -> n >= max)) 
-    (scanAwait (box (\ (n :* max) _ -> (n + 1) :* max)) (n :* max) everySecondSig)
+    (scanAwait (box (\ (n :* max) _ -> (n + 1) :* max)) (n :* max) later)
 
 reset :: (Int :* Int) -> (Int :* Int)
 reset (_ :* max) = (0 :* max)

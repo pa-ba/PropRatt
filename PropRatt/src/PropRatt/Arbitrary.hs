@@ -51,7 +51,7 @@ instance (Arbitrary a) => Arbitrary (Sig a) where
   shrink sig = toSignal (shrinkSignal shrink sig) 
 
 instance (Show a) => Show (Sig a) where
-  show (x ::: xs) = show (toList (x ::: xs))
+  show (x ::: xs) = show (toListWithClock (x ::: xs))
 
 instance (Eq a) => Eq (Sig a) where
   (==) sig1 sig2 = toList sig1 == toList sig2
@@ -103,10 +103,10 @@ sigToTupleList (x ::: (Delay cl f)) =
     else (x, cl) : sigToTupleList (f (InputValue (IntSet.findMin cl) ())) 
 
 genClockChannel :: Gen Int
-genClockChannel = chooseInt (9, 11)
+genClockChannel = chooseInt (1, 3)
 
 genClockChannelWeighted :: Gen Int
-genClockChannelWeighted = frequency [(1, pure 9), (1, pure 10), (50, pure 11)]
+genClockChannelWeighted = frequency [(1, pure 1), (1, pure 2), (50, pure 3)]
 
 genClockList :: Gen [Int]
 genClockList = do

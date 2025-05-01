@@ -18,9 +18,12 @@ import AsyncRattus.Channels
 import AsyncRattus.Signal
 import AsyncRattus.InternalPrimitives
 import Prelude hiding (map, const, zipWith, zip, filter, getLine, putStrLn,null)
+import qualified Data.IntSet as IntSet
+import AsyncRattus.Plugin.Annotation
 
+{-# ANN everySecondSig AllowRecursion #-}
 everySecondSig :: O (Sig ())
-everySecondSig = mkSig (timer 10)
+everySecondSig = Delay (IntSet.fromList [7]) (\_ -> () ::: everySecondSig) 
 
 nats :: (Int :* Int) -> Sig (Int :* Int)
 nats (n :* max) = stop
@@ -96,7 +99,7 @@ prop_timerIsStrictlyMonotonicallyIncreasing :: Property
 prop_timerIsStrictlyMonotonicallyIncreasing = forAll genDouble $ \(reset, slider) ->
         let counterSig  = timerState reset slider
             state       = prepend counterSig $ prepend reset $ singletonH slider
-            predicate   =Always $ Next $ 
+            predicate   = Always $ Next $ 
                 Implies 
                 ((Now (Ticked First)) `And` ((Not (Now (Ticked Second)) `And` (Not (Now (Ticked Third))))))
                 (Now (((fst' <$> (Index First)) |>| (fst' <$> (Index (Previous First))))))
@@ -141,6 +144,20 @@ prop_counterSigStaysAtMaxValue = forAllShrink genDouble shrink $ \(reset, slider
       reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
       return (reset, slider)
 
+
+prop_experiment :: Property
+prop_experiment = forAll genDouble $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ singletonH slider
+            predicate   = Not $ Always $ (Now (Ticked First) `And` (Next $ Now (Ticked First)))
+            result      = evaluate predicate state 
+        in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 10 (chooseInt (0,100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 10 :: Gen (Sig (())))
+      return (reset, slider)
+
 main :: IO ()
 main = do
     quickCheck prop_alwaysLessThanMax
@@ -149,3 +166,4 @@ main = do
     quickCheck prop_timerIsStrictlyMonotonicallyIncreasing
     quickCheck prop_init
     quickCheck prop_counterSigStaysAtMaxValue
+    quickCheck prop_experiment

@@ -29,8 +29,8 @@ instance Num a => Num (Value a) where
 
 instance Show a => Show (Value a) where
   show (Current t Nil) = show t
-  show (Current t (h :! Nil)) = show t ++ "  " ++ show h
-  show (Current t (h :! h2 :! _)) = show t ++ "  " ++ show h ++ "  " ++ show h2
+  show (Current t (h :! Nil)) = show h
+  show (Current t (h :! h2 :! _)) =  show h ++ " " ++ show h2
 
 instance Show a => Show (Sig [Value a]) where
   show sig = "Sig [Value a]: " ++ show (takeSig 100 sig) ++ "..."

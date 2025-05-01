@@ -59,9 +59,14 @@ mkSigOne = 1 ::: Delay (IntSet.fromList [1]) (\_ -> mkSigOne)
 
 {-# ANN mkSigZero AllowRecursion #-}
 mkSigZero :: Sig Int
-mkSigZero = 0 ::: Delay (IntSet.fromList [1]) (\_ -> mkSigZero)
+mkSigZero = 0 ::: Delay (IntSet.fromList [2]) (\_ -> mkSigZero)
+
+{-# ANN mkSigZero2 AllowRecursion #-}
+mkSigZero2 :: Sig Int
+mkSigZero2 = 0 ::: Delay (IntSet.fromList [1]) (\_ -> mkSigZero2)
+
 
 {-# ANN takeSigSig AllowRecursion #-}
 takeSigSig :: Int -> Sig a -> Sig a
-takeSigSig 1 (x ::: Delay cl f) = x ::: never
-takeSigSig n (x ::: later@(Delay cl f)) = x ::: delay (takeSigSig (n-1) (adv later))
+takeSigSig 1 (x ::: _) = x ::: never
+takeSigSig n (x ::: later) = x ::: delay (takeSigSig (n-1) (adv later))

@@ -15,8 +15,9 @@ import PropRatt
 import AsyncRattus.InternalPrimitives
 import Prelude hiding (zip, map, const)
 import AsyncRattus.Signal hiding (filter)
-import AsyncRattus.Strict
+import AsyncRattus.Strict hiding (singleton)
 import Prelude hiding (const, map, zip)
+import AsyncRattus.Plugin.Annotation
 import PropRatt.Utils
 import qualified Data.IntSet as IntSet
 
@@ -199,10 +200,10 @@ prop_firstElement2 = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \intSign
 
 -- Switched signal equals XS until YS has ticked, from then on the value is constant assuming ys has not produced another const signal
 prop_switchR :: Property
-prop_switchR = forAllShrink (generateSignals @Int) shrinkHls  $ \intSignals ->
+prop_switchR = forAll (generateSignals @Int)  $ \intSignals ->
     let xs                  = first intSignals
-        gg@(_ ::: ys)       = (scan (box (\n _ -> n + 1)) 0 (takeSigSig (sigLength xs) mkSigZero)) :: Sig Int
-        zs                  = switchR xs (mapAwait (box (\b a -> const b)) ys)
+        gg@(_ ::: ys)       = (scan (box (\n _ -> n + 1)) 0 (takeSigSig (sigLength xs) mkSigZero)) :: Sig Int -- 1 2 3 4 5 6 
+        zs                  = switchR xs (mapAwait (box (\b a -> const b)) ys) -- 1 1 1 1 1 2 2 2 2 
         state               = prepend zs $ prependLater ys $ flatten intSignals
         predicate           = (Now ((Index First) |==| (Index Third)))
                                 `Until`
@@ -213,7 +214,7 @@ prop_switchR = forAllShrink (generateSignals @Int) shrinkHls  $ \intSignals ->
                                 `Until`
                                (Next $ (Implies (Now (Ticked Second)) (Not (Now ((Index (Previous First)) |==| (Index First))))))
         result              = evaluate predicate state
-    in counterexample (show zs) result
+    in counterexample (show state) result
 
 prop_switchS :: Property
 prop_switchS = forAllShrink (generateSignals @Int) shrinkHls $ \intSignals ->
@@ -222,12 +223,14 @@ prop_switchS = forAllShrink (generateSignals @Int) shrinkHls $ \intSignals ->
         ggg                 = Delay (IntSet.fromList [1,2,3]) (\b a -> const a)
         zs                  = switchS xs ggg
         state               = prepend zs $ prependLater ys $ flatten intSignals
-        predicate           =
-            (Now ((Index First) |==| (Index Third)))
+        predicate           =(Now ((Index First) |==| (Index Third)))
                                 `Until`
-                                ((Now ((Ticked Second) |==| (Pure True)))
-                                `And`
-                                (Next $ Always $ (Now ((Index (Previous First)) |==| (Index First)))))
+                                (Now ((Ticked Second) |==| (Pure True)))
+                                `And` 
+                                ((Always $ Next 
+                                    (((Implies  (Not (Now (Ticked Second))) (Now ((Index (Previous First)) |==| (Index First))))))))
+                                `Until`
+                               (Next $ (Implies (Now (Ticked Second)) (Not (Now ((Index (Previous First)) |==| (Index First))))))
         result              = evaluate predicate state
     in counterexample (show gg ++ show zs ++ show xs) result
 
@@ -254,6 +257,13 @@ prop_catchsubtle = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: S
         in result
 
 
+{-# ANN scramble AllowRecursion #-}
+scramble :: Int -> Sig a -> Sig a
+scramble n sig@(x ::: Delay clx fx) = 
+    if IntSet.null clx 
+        then x ::: never 
+        else x ::: Delay (IntSet.singleton ((n `mod` 3) + 1)) (\_ -> (scramble (n+1) (fx (InputValue (IntSet.findMin clx) ()))))
+
 main :: IO ()
 main = do
     -- quickCheck prop_interleave
@@ -277,4 +287,4 @@ main = do
     -- quickCheck prop_sigIsPositive
     -- quickCheck prop_catchsubtle
     quickCheck prop_switchR
-    -- quickCheck prop_switchS
+    quickCheck prop_switchS

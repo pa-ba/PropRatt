@@ -280,4 +280,5 @@ evaluate p sig =
       min'      = minSigLengthForPred p 1
       tooShort  = len < min'
       scopeOk   = checkScope p
-  in scopeOk && (tooShort || evaluate' (100 `min` len) p sig)
+  in if (not scopeOk) then error "Previous must be in scope of next" else
+    (tooShort || evaluate' (100 `min` len) p sig)

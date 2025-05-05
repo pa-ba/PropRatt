@@ -28,10 +28,10 @@ toListWithClock (x ::: Delay cl f)
     | IntSet.null cl = [(x, cl)]
     | otherwise = (x, cl) : toListWithClock (f (InputValue (smallest cl) ()))
 
-{-# ANN takeSig AllowRecursion #-}
-takeSig :: Int -> Sig a -> [a]
-takeSig 0 _ = []
-takeSig n (x ::: Delay cl f) = x : takeSig (n-1) (f (InputValue (smallest cl) ()))
+{-# ANN toListOfLength AllowRecursion #-}
+toListOfLength :: Int -> Sig a -> [a]
+toListOfLength 0 _ = []
+toListOfLength n (x ::: Delay cl f) = x : toListOfLength (n-1) (f (InputValue (smallest cl) ()))
 
 {-# ANN lengthSig AllowRecursion #-}
 lengthSig :: Sig a -> Int -> Int
@@ -61,12 +61,7 @@ mkSigOne = 1 ::: Delay (IntSet.fromList [1]) (\_ -> mkSigOne)
 mkSigZero :: Sig Int
 mkSigZero = 0 ::: Delay (IntSet.fromList [2]) (\_ -> mkSigZero)
 
-{-# ANN mkSigZero2 AllowRecursion #-}
-mkSigZero2 :: Sig Int
-mkSigZero2 = 0 ::: Delay (IntSet.fromList [1]) (\_ -> mkSigZero2)
-
-
-{-# ANN takeSigSig AllowRecursion #-}
-takeSigSig :: Int -> Sig a -> Sig a
-takeSigSig 1 (x ::: _) = x ::: never
-takeSigSig n (x ::: later) = x ::: delay (takeSigSig (n-1) (adv later))
+{-# ANN takeN AllowRecursion #-}
+takeN :: Int -> Sig a -> Sig a
+takeN 1 (x ::: _) = x ::: never
+takeN n (x ::: later) = x ::: delay (takeN (n-1) (adv later))

@@ -23,12 +23,7 @@ module PropRatt.Arbitrary
     Sig (..),
     generateSignals,
     Map,
-    ToList,
-    take,
     shrinkSignal,
-    shrinkOne,
-    removes,
-    drop,
     shrinkHls
   )
 where
@@ -46,31 +41,34 @@ import PropRatt.HList
 type TSig a = [(a, IntSet.IntSet)]
 
 instance (Arbitrary a) => Arbitrary (Sig a) where
+  arbitrary :: Gen (Sig a)
   arbitrary = arbitrarySig 100
   shrink :: Sig a -> [Sig a]
-  shrink sig = toSignal (shrinkSignal shrink sig) 
+  shrink sig = toSignal (shrinkSignal shrink sig)
 
 instance (Show a) => Show (Sig a) where
-  show (x ::: xs) = show (toListWithClock (x ::: xs))
+  show :: Sig a -> String
+  show (x ::: xs) = show (toList (x ::: xs))
 
 instance (Eq a) => Eq (Sig a) where
+  (==) :: Sig a -> Sig a -> Bool
   (==) sig1 sig2 = toList sig1 == toList sig2
 
 shrinkSignal :: (a -> [a]) -> Sig a -> [TSig a]
 shrinkSignal shr sig@(_ ::: (Delay cly _)) =
   if IntSet.null cly
-    then shrinkOne tupleList shr
-    else concat [ removes k n tupleList | k <- takeWhile (>0) (iterate (`div`2) n) ]
-    ++ shrinkOne tupleList shr
+    then shrinkOne testableSignal shr
+    else concat [ removes k n testableSignal | k <- takeWhile (>0) (iterate (`div`2) n) ]
+    ++ shrinkOne testableSignal shr
   where
     n = sigLength sig
-    tupleList = sigToTupleList sig
-
+    testableSignal = toTSig sig
 
 {-# ANN shrinkOne AllowRecursion #-}
 shrinkOne :: TSig a -> (a -> [a]) -> [TSig a]
-shrinkOne ((x, cl) : []) shr = [ (x', cl) : [] | x'  <- shr x ]
-shrinkOne ((x, cl) : xs) shr = [ (x', cl) : xs | x'  <- shr x ] ++ [ (x, cl) : xs' | xs' <- (shrinkOne xs shr) ]
+shrinkOne [] _ = error "Testable signals are non-empty"
+shrinkOne [(x, cl)] shr = [ [(x', cl)] | x' <- shr x ]
+shrinkOne ((x, cl) : xs) shr = [ (x', cl) : xs | x'  <- shr x ] ++ [ (x, cl) : xs' | xs' <- shrinkOne xs shr ]
 
 {-# ANN removes AllowRecursion #-}
 removes :: Int -> Int -> TSig a -> [TSig a]
@@ -84,23 +82,24 @@ removes k n tupleLs =
 {-# ANN toSignal AllowRecursion #-}
 toSignal :: [TSig a] -> [Sig a]
 toSignal [] = []
-toSignal (x : []) = [tupleListToSig x]
-toSignal (x : xs) = tupleListToSig x : toSignal xs
+toSignal [x] = [fromTSig x]
+toSignal (x : xs) = fromTSig x : toSignal xs
 
-{-# ANN tupleListToSig AllowRecursion #-}
-tupleListToSig :: TSig a -> Sig a
-tupleListToSig ((x, cl) : []) = x ::: never
-tupleListToSig ((x, cl) : xs) = 
-  if IntSet.null cl 
-    then x ::: never 
-    else x ::: Delay cl (\_ -> tupleListToSig xs)
+{-# ANN fromTSig AllowRecursion #-}
+fromTSig :: TSig a -> Sig a
+fromTSig [] = error "Testable signals are non-empty"
+fromTSig [(x, _)] = x ::: never
+fromTSig ((x, cl) : xs) =
+  if IntSet.null cl
+    then x ::: never
+    else x ::: Delay cl (\_ -> fromTSig xs)
 
-{-# ANN sigToTupleList AllowRecursion #-}
-sigToTupleList :: Sig a -> TSig a
-sigToTupleList (x ::: (Delay cl f)) =
-  if IntSet.null cl 
-    then [(x, IntSet.empty)] 
-    else (x, cl) : sigToTupleList (f (InputValue (IntSet.findMin cl) ())) 
+{-# ANN toTSig AllowRecursion #-}
+toTSig :: Sig a -> TSig a
+toTSig (x ::: (Delay cl f)) =
+  if IntSet.null cl
+    then [(x, IntSet.empty)]
+    else (x, cl) : toTSig (f (InputValue (IntSet.findMin cl) ()))
 
 genClockChannel :: Gen Int
 genClockChannel = chooseInt (1, 3)
@@ -135,7 +134,7 @@ arbitrarySig n = do
           return (x ::: later)
 
 {-# ANN arbitrarySigWith AllowRecursion #-}
-arbitrarySigWith :: (Arbitrary a) => Int -> Gen a -> Gen (Sig a)
+arbitrarySigWith :: Int -> Gen a -> Gen (Sig a)
 arbitrarySigWith n gen = do
   if n <= 0
     then error "Cannot create empty signals"
@@ -201,7 +200,7 @@ instance ShrinkHList '[] where
   shrinkHls _ = []
 
 instance (Arbitrary a, ShrinkHList as) => ShrinkHList (a ': as) where
-  shrinkHls (HCons x xs) = 
-    [ HCons x' xs | x'  <- shrink x ] ++ 
+  shrinkHls (HCons x xs) =
+    [ HCons x' xs | x'  <- shrink x ] ++
     [ HCons x xs' | xs' <- shrinkHls xs ] ++
     [ HCons x' xs' | x'  <- shrink x, xs' <- shrinkHls xs ]

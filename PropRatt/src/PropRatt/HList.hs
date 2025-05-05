@@ -15,7 +15,7 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module PropRatt.HList where       
-import AsyncRattus.InternalPrimitives
+import AsyncRattus.InternalPrimitives ( Stable )
 import Data.Kind (Type)
 
 data HList :: [Type] -> Type where
@@ -31,6 +31,7 @@ instance Show (HList '[]) where
   show HNil = "HNil"
 
 instance (Show x, (Show (HList xs))) => Show (HList (x ': xs)) where
+  show :: (Show x, Show (HList xs)) => HList (x : xs) -> String
   show (HCons x xs) = show x ++ " %: " ++ show xs
 
 instance Stable (HList '[]) where

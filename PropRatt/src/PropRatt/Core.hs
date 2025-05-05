@@ -25,8 +25,6 @@ import AsyncRattus.Signal
 import AsyncRattus.Strict hiding (singleton)
 import AsyncRattus.InternalPrimitives hiding (never)
 import PropRatt.Value
-import PropRatt.Arbitrary
-import qualified Data.IntSet as IntSet
 import PropRatt.HList
 import Prelude hiding (const)
 
@@ -37,6 +35,7 @@ class Stable (HList vals) => Flatten sigs vals | sigs -> vals, vals -> sigs wher
   flatten :: HList sigs -> Sig (HList vals)
 
 instance Flatten '[] '[] where
+  flatten :: HList '[] -> Sig (HList '[])
   flatten HNil = emptySig
 
 instance (Stable a, Stable (Value a), Flatten as bs, Falsify bs) => Flatten (Sig a ': as) (Value a ': bs) where
@@ -54,6 +53,8 @@ instance (Falsify ts) => Falsify (Value t ': ts) where
   toFalse :: HList (Value t : ts) -> HList (Value t : ts)
   toFalse (HCons (Current _ x) t) = Current (HasTicked False) x %: toFalse t
 
+-- | Like 'prepend', but the new head is delayed by one tick.
+--   This emits a dummy value at the head on the first tick, then behaves like 'prepend' on subsequent ticks.
 prependLater :: (Stable t, Stable (HList ts), Falsify ts) => O (Sig t) -> Sig (HList ts) -> Sig (HList (Value t ': ts))
 prependLater xs (y ::: ys) =
   HCons (Current (HasTicked False) Nil) y ::: prependAwait Nil xs y ys
@@ -69,16 +70,5 @@ prependAwait x xs y ys  = delay (
      Snd xs' (y' ::: ys')           -> (Current (HasTicked False) x %: y')                ::: prependAwait x xs' y' ys'
      Both (x' ::: xs') (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y')         ::: prependAwait (x' :! x) xs' y' ys')
 
-singleton ::  (Stable t) => Sig t -> Sig (HList (Map Value '[t]))
-singleton sig = singletonAwait sig Nil
-
-singletonAwait :: (Stable t) => Sig t -> List t -> Sig (HList (Map Value '[t]))
-singletonAwait (h ::: t@(Delay cl _)) acc = if IntSet.null cl 
-  then HCons (Current (HasTicked True) (h :! acc)) HNil ::: never
-  else HCons (Current (HasTicked True) (h :! acc)) HNil ::: delay (singletonAwait (adv t) (h :! acc))
-
 singletonH :: (Stable t) => Sig t -> Sig (HList '[Value t])
 singletonH sig = flatten (sig %: HNil)
-
-never :: O (Sig (HList (Map Value '[t])))
-never = Delay IntSet.empty (error "Trying to adv on the 'never' delayed computation")

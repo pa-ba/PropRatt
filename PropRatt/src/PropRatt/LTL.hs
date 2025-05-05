@@ -11,6 +11,7 @@
 module PropRatt.LTL
   ( Pred (..),
     evaluate,
+    evaluateWith,
     Atom (..),
     Lookup (..),
     (|<|),
@@ -111,7 +112,7 @@ x |==| y = (==) <$> x <*> y
 checkScope :: Pred ts t -> Bool
 checkScope p = checkPred p 0
 
--- | Traverses the predicate supplied and exits early if it finds t subtree where the scope is negative.
+-- | Traverses the predicate supplied and exits early if it finds a subtree where the scope is negative.
 -- The scope is incremented for each next constructor, and decremented for each previous or prior constructor.
 checkPred :: Pred ts t -> Int -> Bool
 checkPred predicate scope =
@@ -129,25 +130,9 @@ checkPred predicate scope =
     Release p1 p2   -> checkPred p1 scope && checkPred p2 scope
     Always p        -> checkPred p scope
     Eventually p    -> checkPred p scope
-    After _ p       -> checkPred p scope
+    After n p       -> checkPred p (scope + n)
   where
     valid s = s >= 0
-
--- Returns the amount of signal elements needed, to evaluate the predicate at least once
-minSigLengthForPred :: Pred ts t -> Int -> Int
-minSigLengthForPred predicate acc =
-    case predicate of
-      Not p           -> minSigLengthForPred p acc
-      And p1 p2       -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
-      Or p1 p2        -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
-      Until p1 p2     -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
-      Next p          -> minSigLengthForPred p (acc + 1)
-      Implies p1 p2   -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
-      Release p1 p2   -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
-      Always p        -> minSigLengthForPred p acc
-      Eventually p    -> minSigLengthForPred p acc
-      After n p       -> minSigLengthForPred p (acc + n)
-      _               -> acc
 
 -- | Propegates the smallest scope found by traversing the atom.
 checkAtom :: Atom ts t -> Int -> Int
@@ -164,6 +149,22 @@ checkLookup lu scope =
     Previous lu'  -> checkLookup lu' (scope - 1)
     Prior n lu'   -> checkLookup lu' (scope - n)
     _             -> scope
+
+-- Returns the amount of signal elements needed to evaluate the predicate.
+minSigLengthForPred :: Pred ts t -> Int -> Int
+minSigLengthForPred predicate acc =
+    case predicate of
+      Not p           -> minSigLengthForPred p acc
+      And p1 p2       -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Or p1 p2        -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Until p1 p2     -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Next p          -> minSigLengthForPred p (acc + 1)
+      Implies p1 p2   -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Release p1 p2   -> minSigLengthForPred p1 acc `max` minSigLengthForPred p2 acc
+      Always p        -> minSigLengthForPred p acc
+      Eventually p    -> minSigLengthForPred p acc
+      After n p       -> minSigLengthForPred p (acc + n)
+      _               -> acc
 
 nthPrevious :: Int -> Value t -> Maybe' (Value t)
 nthPrevious n curr@(Current b history)
@@ -222,8 +223,9 @@ evalLookup lu hls = case lu of
   Eighth        -> Just' (eighth hls)
   Ninth         -> Just' (ninth hls)
 
+-- Evaluate a single timestep. Used exclusively for shrink cases.
 evaluateSingle  :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
-evaluateSingle timestepsLeft formulae sig@(x ::: Delay cl f) =
+evaluateSingle timestepsLeft formulae sig@(x ::: _) =
   timestepsLeft <= 0 || case formulae of
             Tautology       -> True
             Contradiction   -> False
@@ -235,18 +237,18 @@ evaluateSingle timestepsLeft formulae sig@(x ::: Delay cl f) =
             And phi psi     -> eval phi sig && eval psi sig
             Or phi psi      -> eval phi sig || eval psi sig
             Until phi psi   -> eval psi sig || eval phi sig
-            Next phi        -> True
+            Next _          -> True
             Implies phi psi -> not (eval phi sig && not (eval psi sig))
             Always phi      -> eval phi sig
             Eventually phi  -> eval phi sig 
-            Release phi psi -> True 
-            After n phi     -> True
+            Release _ _     -> True 
+            After _ _       -> True
         where
           eval = evaluateSingle timestepsLeft
 
 evaluate' :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
 evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
-  if IntSet.null cl 
+  if IntSet.null cl
     then evaluateSingle timestepsLeft formulae sig
     else timestepsLeft <= 0 || case formulae of
             Tautology       -> True
@@ -273,12 +275,21 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
         eval = evaluate' timestepsLeft
         advance = f (InputValue (IntSet.findMin cl) ())
 
+-- Finds the minimum length a signal must have for the pred to be tested.
+-- If the length of the signal is too short, short circuit evaluation to true (shrink cases).
 evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
-evaluate p sig =
+evaluate = evaluateWith 100
+
+evaluateWith :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
+evaluateWith fallback p sig =
   let len       = sigLength sig
-      -- Find the minimum length that a signal must have, in order for the pred to be tested.
       min'      = minSigLengthForPred p 1
       tooShort  = len < min'
       scopeOk   = checkScope p
-  in if (not scopeOk) then error "Previous must be in scope of next" else
-    (tooShort || evaluate' (100 `min` len) p sig)
+  in 
+    if not scopeOk
+      then error "Previous must be in scope of next" 
+    else if min' > fallback
+      then error ("Cannot evaluate more than " ++ show fallback ++ " values.\n" ++ "Predicate requires " ++ show min' ++ " timesteps. Consider using evaluateWith (>= " ++ show min' ++ ")")
+    else
+      tooShort || evaluate' (fallback `min` len) p sig

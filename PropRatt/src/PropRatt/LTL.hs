@@ -281,7 +281,7 @@ evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
 evaluate = evaluateWith 100
 
 evaluateWith :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
-evaluateWith fallback p sig =
+evaluateWith defaultTimeStepsToCheck p sig =
   let len       = sigLength sig
       min'      = minSigLengthForPred p 1
       tooShort  = len < min'
@@ -289,7 +289,7 @@ evaluateWith fallback p sig =
   in 
     if not scopeOk
       then error "Previous must be in scope of next" 
-    else if min' > fallback
-      then error ("Cannot evaluate more than " ++ show fallback ++ " values.\n" ++ "Predicate requires " ++ show min' ++ " timesteps. Consider using evaluateWith (>= " ++ show min' ++ ")")
+    else if min' > defaultTimeStepsToCheck
+      then error ("Cannot evaluate more than " ++ show defaultTimeStepsToCheck ++ " values.\n" ++ "Predicate requires " ++ show min' ++ " timesteps. Consider using evaluateWith (>= " ++ show min' ++ ")")
     else
-      tooShort || evaluate' (fallback `min` len) p sig
+      tooShort || evaluate' (defaultTimeStepsToCheck `min` len) p sig

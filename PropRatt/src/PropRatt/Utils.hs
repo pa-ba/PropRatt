@@ -57,6 +57,14 @@ getLater (_ ::: xs) = xs
 mkSigOne :: Sig Int
 mkSigOne = 1 ::: Delay (IntSet.fromList [1]) (\_ -> mkSigOne)
 
+{-# ANN nats AllowRecursion #-}
+nats :: Int -> Sig Int
+nats 2 = 3 ::: never
+nats 1 = 2 ::: Delay (IntSet.fromList [1]) (\_ -> nats 2)
+nats 0 = 1 ::: Delay (IntSet.fromList [1]) (\_ -> nats 1)
+nats _ = error "hej"
+
+
 {-# ANN mkSigZero AllowRecursion #-}
 mkSigZero :: Sig Int
 mkSigZero = 0 ::: Delay (IntSet.fromList [2]) (\_ -> mkSigZero)

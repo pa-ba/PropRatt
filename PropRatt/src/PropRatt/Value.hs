@@ -16,7 +16,7 @@ import AsyncRattus
 newtype HasTicked = HasTicked Bool deriving Show
 
 data Value a where
-  Current :: !HasTicked -> !(List a) -> Value a
+  Current :: HasTicked -> (List a) -> Value a
 
 instance Stable (Value a) where 
 instance Num a => Num (Value a) where

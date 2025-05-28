@@ -101,16 +101,17 @@ toTSig (x ::: (Delay cl f)) =
     then [(x, IntSet.empty)]
     else (x, cl) : toTSig (f (InputValue (IntSet.findMin cl) ()))
 
-genClockChannel :: Gen Int
-genClockChannel = chooseInt (1, 3)
-
 genClockChannelWeighted :: Gen Int
 genClockChannelWeighted = frequency [(1, pure 1), (1, pure 2), (50, pure 3)]
 
-genClockList :: Gen [Int]
-genClockList = do
-  len <- chooseInt (1, 3)
-  vectorOf len genClockChannel
+genClock :: Int -> Gen Clock
+genClock n = case n of
+    1 -> do
+      x <- chooseInt (1,3)
+      return (IntSet.fromList [x])
+    2 -> frequency [(1, return (IntSet.fromList [1,2])),(1, return (IntSet.fromList [2,3])),(1, return (IntSet.fromList [1,3]))]
+    3 -> return (IntSet.fromList [1,2,3])
+    _ -> error "Partial function doesnt support n > 3"
 
 genClockListWeighted :: Gen [Int]
 genClockListWeighted = vectorOf 1 genClockChannelWeighted
@@ -128,9 +129,10 @@ arbitrarySig n = do
           return (x ::: never)
         go m = do
           x <- arbitrary
-          cl <- genClockList
+          len <- chooseInt (1, 3)
+          cl <- genClock len
           xs <- go (m - 1)
-          let later = Delay (IntSet.fromList cl) (\_ -> xs)
+          let later = Delay cl (\_ -> xs)
           return (x ::: later)
 
 {-# ANN arbitrarySigWith AllowRecursion #-}
@@ -146,9 +148,10 @@ arbitrarySigWith n gen = do
           return (x ::: never)
         go m = do
           x <- gen
-          cl <- genClockList
+          len <- chooseInt (1, 3)
+          cl <- genClock len
           xs <- go (m - 1)
-          let later = Delay (IntSet.fromList cl) (\_ -> xs)
+          let later = Delay cl (\_ -> xs)
           return (x ::: later)
 
 {-# ANN arbitrarySigWeighted AllowRecursion #-}

@@ -12,7 +12,7 @@ module PropRatt.LTL
   ( Pred (..),
     evaluate,
     evaluateWith,
-    Atom (..),
+    Expr (..),
     Lookup (..),
     (|<|),
     (|<=|),
@@ -46,11 +46,11 @@ data Pred (ts :: [Type]) (t :: Type) where
   After         :: Int -> Pred ts t -> Pred ts t
   Release       :: Pred ts t -> Pred ts t -> Pred ts t
 
-data Atom (ts :: [Type]) (t :: Type) where
-  Pure    :: t -> Atom ts t
-  Apply   :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
-  Index   :: Lookup ts t -> Atom ts t
-  Ticked  :: Lookup ts t -> Atom ts Bool
+data Expr (ts :: [Type]) (t :: Type) where
+  Pure    :: t -> Expr ts t
+  Apply   :: Expr ts (t -> r) -> Expr ts t -> Expr ts r
+  Index   :: Lookup ts t -> Expr ts t
+  Ticked  :: Lookup ts t -> Expr ts Bool
 
 data Lookup (ts :: [Type]) (t :: Type) where
   Previous  :: Lookup ts t -> Lookup ts t
@@ -65,35 +65,35 @@ data Lookup (ts :: [Type]) (t :: Type) where
   Eighth    :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': Value t ': x8) t
   Ninth     :: Lookup (x1 ': x2 ': x3 ': x4 ': x5 ': x6 ': x7 ': x8 ': Value t ': x9) t
 
-instance Functor (Atom ts) where
-  fmap :: (t -> r) -> Atom ts t -> Atom ts r
+instance Functor (Expr ts) where
+  fmap :: (t -> r) -> Expr ts t -> Expr ts r
   fmap f (Pure x)     = Pure (f x)
   fmap f (Apply g x)  = Apply (fmap (f .) g) x
   fmap f (Index lu)   = Apply (Pure f) (Index lu)
   fmap f (Ticked lu)  = Apply (Pure f) (Ticked lu)
 
-instance Applicative (Atom ts) where
-    pure :: t -> Atom ts t
+instance Applicative (Expr ts) where
+    pure :: t -> Expr ts t
     pure = Pure
-    (<*>) :: Atom ts (t -> r) -> Atom ts t -> Atom ts r
+    (<*>) :: Expr ts (t -> r) -> Expr ts t -> Expr ts r
     Pure f <*> x = fmap f x
     Apply f g <*> x = Apply (Apply f g) x
-    (<*>) _ _ = error "Atom: unsupported constructor for applicative application."
+    (<*>) _ _ = error "Expr: unsupported constructor for applicative application."
 
-instance Num t => Num (Atom ts t) where
-  (+) :: Atom ts t -> Atom ts t -> Atom ts t
+instance Num t => Num (Expr ts t) where
+  (+) :: Expr ts t -> Expr ts t -> Expr ts t
   (+) x y = (+) <$> x <*> y
-  (-) :: Atom ts t -> Atom ts t -> Atom ts t
+  (-) :: Expr ts t -> Expr ts t -> Expr ts t
   (-) x y = (-) <$> x <*> y
-  (*) :: Atom ts t -> Atom ts t -> Atom ts t
+  (*) :: Expr ts t -> Expr ts t -> Expr ts t
   (*) x y = (*) <$> x <*> y
-  negate :: Atom ts t -> Atom ts t
+  negate :: Expr ts t -> Expr ts t
   negate = fmap negate
-  abs :: Atom ts t -> Atom ts t
+  abs :: Expr ts t -> Expr ts t
   abs = fmap abs
-  signum :: Atom ts t -> Atom ts t
+  signum :: Expr ts t -> Expr ts t
   signum = fmap signum
-  fromInteger :: Integer -> Atom ts t
+  fromInteger :: Integer -> Expr ts t
   fromInteger n = pure (fromInteger n)
 
 (|<|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
@@ -120,7 +120,7 @@ checkPred predicate scope =
   case predicate of
     Tautology       -> valid scope
     Contradiction   -> valid scope
-    Now atom        -> valid (checkAtom atom scope)
+    Now expr        -> valid (checkExpr expr scope)
     Not p           -> checkPred p scope
     And p1 p2       -> checkPred p1 scope && checkPred p2 scope
     Or p1 p2        -> checkPred p1 scope || checkPred p2 scope
@@ -134,12 +134,12 @@ checkPred predicate scope =
   where
     valid s = s >= 0
 
--- | Propegates the smallest scope found by traversing the atom.
-checkAtom :: Atom ts t -> Int -> Int
-checkAtom atom scope =
-  case atom of
+-- | Propegates the smallest scope found by traversing the expr.
+checkExpr :: Expr ts t -> Int -> Int
+checkExpr expr scope =
+  case expr of
     Pure _        -> scope
-    Apply fun arg -> min (checkAtom fun scope) (checkAtom arg scope)
+    Apply fun arg -> min (checkExpr fun scope) (checkExpr arg scope)
     Index lu      -> checkLookup lu scope
     Ticked lu     -> checkLookup lu scope
 
@@ -191,15 +191,15 @@ evalTicked lu hls = case lu of
     errorTickedPast                   = error "Cannot check if signal has ticked in the past."
     extract (Current (HasTicked b) _) = b
 
-evalAtom :: Atom ts t -> HList ts -> Atom ts t
-evalAtom (Pure x) _      = pure x
-evalAtom (Apply f x) hls = (($) <$> evalAtom f hls) <*> evalAtom x hls
-evalAtom (Index lu) hls  =
+evalExpr :: Expr ts t -> HList ts -> Expr ts t
+evalExpr (Pure x) _      = pure x
+evalExpr (Apply f x) hls = (($) <$> evalExpr f hls) <*> evalExpr x hls
+evalExpr (Index lu) hls  =
   case evalLookup lu hls of
     Just' (Current _ (h :! _)) -> pure h
     Just' (Current _ Nil)      -> error "History not found for signal."
     Nothing'                   -> error "Signal not found."
-evalAtom (Ticked lu) hls = pure (evalTicked lu hls)
+evalExpr (Ticked lu) hls = pure (evalTicked lu hls)
 
 evalLookup :: Lookup ts t -> HList ts -> Maybe' (Value t)
 evalLookup lu hls = case lu of
@@ -229,8 +229,8 @@ evaluateSingle timestepsLeft formulae sig@(x ::: _) =
   timestepsLeft <= 0 || case formulae of
             Tautology       -> True
             Contradiction   -> False
-            Now atom        ->
-              case evalAtom atom x of
+            Now expr        ->
+              case evalExpr expr x of
                 Pure b -> b
                 _ -> error "Unexpected error during evaluation."
             Not phi         -> not (eval phi sig)
@@ -253,8 +253,8 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
     else timestepsLeft <= 0 || case formulae of
             Tautology       -> True
             Contradiction   -> False
-            Now atom        ->
-              case evalAtom atom x of
+            Now expr        ->
+              case evalExpr expr x of
                 Pure b -> b
                 _ -> error "Unexpected error during evaluation."
             Not phi         -> not (eval phi sig)

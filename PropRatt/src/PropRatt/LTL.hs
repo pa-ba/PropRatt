@@ -34,7 +34,7 @@ import PropRatt.Utils
 data Pred (ts :: [Type]) (t :: Type) where
   Tautology     :: Pred ts t
   Contradiction :: Pred ts t
-  Now           :: Atom ts Bool -> Pred ts Bool
+  Now           :: Expr ts Bool -> Pred ts Bool
   Not           :: Pred ts t -> Pred ts t
   And           :: Pred ts t -> Pred ts t -> Pred ts t
   Or            :: Pred ts t -> Pred ts t -> Pred ts t

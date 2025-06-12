@@ -11,4 +11,6 @@ PropRatt is a Haskell framework for testing AsyncRattus using property-based tes
 # Running examples
 
 - `stack run`
+
+
 - `stack run timer-example`

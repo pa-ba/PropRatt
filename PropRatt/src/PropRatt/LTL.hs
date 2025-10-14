@@ -31,20 +31,20 @@ import PropRatt.Value
 import PropRatt.HList
 import PropRatt.Utils
 
-data Pred (ts :: [Type]) (t :: Type) where
-  Tautology     :: Pred ts t
-  Contradiction :: Pred ts t
-  Now           :: Expr ts Bool -> Pred ts Bool
-  Not           :: Pred ts t -> Pred ts t
-  And           :: Pred ts t -> Pred ts t -> Pred ts t
-  Or            :: Pred ts t -> Pred ts t -> Pred ts t
-  Until         :: Pred ts t -> Pred ts t -> Pred ts t
-  Next          :: Pred ts t -> Pred ts t
-  Implies       :: Pred ts t -> Pred ts t -> Pred ts t
-  Always        :: Pred ts t -> Pred ts t
-  Eventually    :: Pred ts t -> Pred ts t
-  After         :: Int -> Pred ts t -> Pred ts t
-  Release       :: Pred ts t -> Pred ts t -> Pred ts t
+data Pred (ts :: [Type]) where
+  Tautology     :: Pred ts
+  Contradiction :: Pred ts
+  Now           :: Expr ts Bool -> Pred ts
+  Not           :: Pred ts -> Pred ts
+  And           :: Pred ts -> Pred ts -> Pred ts
+  Or            :: Pred ts -> Pred ts -> Pred ts
+  Until         :: Pred ts -> Pred ts -> Pred ts
+  Next          :: Pred ts -> Pred ts
+  Implies       :: Pred ts -> Pred ts -> Pred ts
+  Always        :: Pred ts -> Pred ts
+  Eventually    :: Pred ts -> Pred ts
+  After         :: Int -> Pred ts-> Pred ts
+  Release       :: Pred ts -> Pred ts -> Pred ts
 
 data Expr (ts :: [Type]) (t :: Type) where
   Pure    :: t -> Expr ts t
@@ -109,12 +109,12 @@ x |==| y = (==) <$> x <*> y
 
 -- | Checks whether the instances of "previous" is within scope of t "next" operator.
 -- This prevents the evaluation from looking too far back in time.
-checkScope :: Pred ts t -> Bool
+checkScope :: Pred ts -> Bool
 checkScope p = checkPred p 0
 
 -- | Traverses the predicate supplied and exits early if it finds a subtree where the scope is negative.
 -- The scope is incremented for each next constructor, and decremented for each previous or prior constructor.
-checkPred :: Pred ts t -> Int -> Bool
+checkPred :: Pred ts -> Int -> Bool
 checkPred predicate scope =
   valid scope &&
   case predicate of
@@ -151,7 +151,7 @@ checkLookup lu scope =
     _             -> scope
 
 -- Returns the amount of signal elements needed to evaluate the predicate.
-minSigLengthForPred :: Pred ts t -> Int -> Int
+minSigLengthForPred :: Pred ts -> Int -> Int
 minSigLengthForPred predicate acc =
     case predicate of
       Not p           -> minSigLengthForPred p acc
@@ -224,7 +224,7 @@ evalLookup lu hls = case lu of
   Ninth         -> Just' (ninth hls)
 
 -- Evaluate a single timestep. Used exclusively for shrink cases.
-evaluateSingle  :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
+evaluateSingle  :: Int -> Pred ts -> Sig (HList ts) -> Bool
 evaluateSingle timestepsLeft formulae sig@(x ::: _) =
   timestepsLeft <= 0 || case formulae of
             Tautology       -> True
@@ -246,7 +246,7 @@ evaluateSingle timestepsLeft formulae sig@(x ::: _) =
         where
           eval = evaluateSingle timestepsLeft
 
-evaluate' :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
+evaluate' :: Int -> Pred ts -> Sig (HList ts) -> Bool
 evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
   if IntSet.null cl
     then evaluateSingle timestepsLeft formulae sig
@@ -277,10 +277,10 @@ evaluate' timestepsLeft formulae sig@(x ::: Delay cl f) =
 
 -- Finds the minimum length a signal must have for the pred to be tested.
 -- If the length of the signal is too short, short circuit evaluation to true (shrink cases).
-evaluate :: (Ord t) => Pred ts t -> Sig (HList ts) -> Bool
+evaluate :: Pred ts -> Sig (HList ts) -> Bool
 evaluate = evaluateWith 100
 
-evaluateWith :: (Ord t) => Int -> Pred ts t -> Sig (HList ts) -> Bool
+evaluateWith :: Int -> Pred ts -> Sig (HList ts) -> Bool
 evaluateWith defaultTimeStepsToCheck p sig =
   let len       = sigLength sig
       min'      = minSigLengthForPred p 1

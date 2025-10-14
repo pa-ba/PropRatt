@@ -1,17 +1,10 @@
 cabal-version: 2.2
-
--- This file has been generated from package.yaml by hpack version 0.37.0.
---
--- see: https://github.com/sol/hpack
-
 name:           PropRatt
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/test#readme>
-homepage:       https://github.com/githubuser/PropRatt#readme
-bug-reports:    https://github.com/githubuser/PropRatt/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2024 Author name here
+description:    PropRatt is a property-based testing framework for testing Async Rattus programs.
+author:         Christian Emil Nielsen, Mathias Faber Kristiansen, Patrick Bahr
+maintainer:     paba@itu.dk
+copyright:      2025 Christian Emil Nielsen, Mathias Faber Kristiansen, Patrick Bahr
 license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
@@ -30,12 +23,10 @@ library
       PropRatt.Core
       PropRatt.HList
       PropRatt.LTL
+      PropRatt.Signal
+  other-modules:
       PropRatt.Utils
       PropRatt.Value
-  other-modules:
-      Paths_PropRatt
-  autogen-modules:
-      Paths_PropRatt
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
@@ -49,10 +40,6 @@ library
 
 executable main-example
   main-is: Main.hs
-  other-modules:
-      Paths_PropRatt
-  autogen-modules:
-      Paths_PropRatt
   hs-source-dirs:
       examples/main
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
@@ -67,10 +54,7 @@ executable main-example
 
 executable timer-example
   main-is: Timer.hs
-  other-modules:
-      Paths_PropRatt
-  autogen-modules:
-      Paths_PropRatt
+
   hs-source-dirs:
       examples/timer
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
@@ -86,10 +70,6 @@ executable timer-example
 test-suite PropRatt-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
-  other-modules:
-      Paths_PropRatt
-  autogen-modules:
-      Paths_PropRatt
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N

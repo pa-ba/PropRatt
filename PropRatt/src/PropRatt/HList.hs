@@ -1,4 +1,3 @@
-{-# OPTIONS -fplugin=AsyncRattus.Plugin #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
@@ -14,7 +13,7 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
-module PropRatt.HList where       
+module PropRatt.HList (HList(..), (%:), first,second,third,fourth,fifth,sixth,seventh,eighth,ninth,lengthH) where       
 import AsyncRattus.InternalPrimitives ( Stable )
 import Data.Kind (Type)
 
@@ -63,3 +62,8 @@ eighth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h8 
 
 ninth :: HList (_ ': _ ': _ ': _ ': _ ': _ ': _ ': _ ': a ': _) -> a
 ninth (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons _ (HCons h9 _))))))))) = h9
+
+
+lengthH :: HList ts -> Int -> Int
+lengthH HNil n = n
+lengthH (HCons _ as) n = lengthH as (n+1)

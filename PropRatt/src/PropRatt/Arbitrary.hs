@@ -1,4 +1,3 @@
-{-# OPTIONS -fplugin=AsyncRattus.Plugin #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# LANGUAGE TypeOperators #-}

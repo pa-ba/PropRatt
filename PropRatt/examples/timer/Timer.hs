@@ -1,11 +1,7 @@
 {-# OPTIONS -fplugin=AsyncRattus.Plugin #-}
-
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# HLINT ignore "Redundant bracket" #-}
-{-# HLINT ignore "Move brackets to avoid $" #-}
-{-# HLINT ignore "Use const" #-}
 
 module Main (main) where
 
@@ -17,6 +13,9 @@ import AsyncRattus.InternalPrimitives
 import Prelude hiding (map, const, zipWith, zip, filter, getLine, putStrLn,null, max)
 import qualified Data.IntSet as IntSet
 import AsyncRattus.Plugin.Annotation
+
+
+{-# ANN module AllowLazyData #-}
 
 {-# ANN everySecondSig AllowRecursion #-}
 everySecondSig :: O (Sig ())

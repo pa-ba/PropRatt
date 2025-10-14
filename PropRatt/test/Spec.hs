@@ -7,7 +7,7 @@ import Test.QuickCheck
 import PropRatt.Arbitrary
 import PropRatt.Core
 import PropRatt.HList
-import PropRatt.Utils
+import PropRatt.Signal
 
 prop_shouldAddToHList :: Property
 prop_shouldAddToHList = forAll (generateSignals @[Int, Int]) $ \intSignals ->

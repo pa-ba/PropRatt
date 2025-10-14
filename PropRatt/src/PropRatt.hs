@@ -10,4 +10,4 @@ import PropRatt.Core
 import PropRatt.LTL
 import PropRatt.Arbitrary
 import PropRatt.HList
-import PropRatt.Utils (getLater)
+import PropRatt.Utils

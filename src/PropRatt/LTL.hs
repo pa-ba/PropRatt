@@ -77,8 +77,7 @@ instance Applicative (Expr ts) where
     pure = Pure
     (<*>) :: Expr ts (t -> r) -> Expr ts t -> Expr ts r
     Pure f <*> x = fmap f x
-    Apply f g <*> x = Apply (Apply f g) x
-    (<*>) _ _ = error "Expr: unsupported constructor for applicative application."
+    f <*> x = Apply f x
 
 instance Num t => Num (Expr ts t) where
   (+) :: Expr ts t -> Expr ts t -> Expr ts t

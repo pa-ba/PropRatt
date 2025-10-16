@@ -51,24 +51,24 @@ instance Falsify '[] where
 
 instance (Falsify ts) => Falsify (Value t ': ts) where
   toFalse :: HList (Value t : ts) -> HList (Value t : ts)
-  toFalse (HCons (Current _ x) t) = Current (HasTicked False) x %: toFalse t
+  toFalse (HCons (Current _ x) t) = Current (HasTick False) x %: toFalse t
 
 -- | Like 'prepend', but the new head is delayed by one tick.
 --   This emits a dummy value at the head on the first tick, then behaves like 'prepend' on subsequent ticks.
 prependLater :: (Stable t, Stable (HList ts), Falsify ts) => O (Sig t) -> Sig (HList ts) -> Sig (HList (Value t ': ts))
 prependLater xs (y ::: ys) =
-  HCons (Current (HasTicked False) Nil) y ::: prependAwait Nil xs y ys
+  HCons (Current (HasTick False) Nil) y ::: prependAwait Nil xs y ys
 
 prepend :: (Stable t, Stable (HList ts), Falsify ts) => Sig t -> Sig (HList ts) -> Sig (HList (Value t ': ts))
 prepend (x ::: xs) (y ::: ys) =
-  HCons (Current (HasTicked True) (x :! Nil)) y ::: prependAwait (x :! Nil) xs y ys
+  HCons (Current (HasTick True) (x :! Nil)) y ::: prependAwait (x :! Nil) xs y ys
 
 prependAwait :: (Stable t, Stable hls, hls ~ HList ts, Falsify ts) => List t -> O (Sig t) -> hls -> O (Sig hls) -> O (Sig (HList (Value t ': ts)))
 prependAwait x xs y ys  = delay (
   case select xs ys of
-     Fst (x' ::: xs')   ys'         -> (Current (HasTicked True) (x' :! x) %: toFalse y)  ::: prependAwait (x' :! x) xs' y ys'
-     Snd xs' (y' ::: ys')           -> (Current (HasTicked False) x %: y')                ::: prependAwait x xs' y' ys'
-     Both (x' ::: xs') (y' ::: ys') -> (Current (HasTicked True) (x' :! x) %: y')         ::: prependAwait (x' :! x) xs' y' ys')
+     Fst (x' ::: xs')   ys'         -> (Current (HasTick True) (x' :! x) %: toFalse y)  ::: prependAwait (x' :! x) xs' y ys'
+     Snd xs' (y' ::: ys')           -> (Current (HasTick False) x %: y')                ::: prependAwait x xs' y' ys'
+     Both (x' ::: xs') (y' ::: ys') -> (Current (HasTick True) (x' :! x) %: y')         ::: prependAwait (x' :! x) xs' y' ys')
 
 singletonH :: (Stable t) => Sig t -> Sig (HList '[Value t])
 singletonH sig = flatten (sig %: HNil)

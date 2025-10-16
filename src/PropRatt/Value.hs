@@ -6,16 +6,16 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables, UndecidableInstances #-}
 
-module PropRatt.Value (Value(..),pureVal,current, HasTicked(..)) where
+module PropRatt.Value (Value(..),pureVal,current, HasTick(..)) where
 import AsyncRattus.Strict
 import AsyncRattus.Signal hiding (current)
 import PropRatt.Utils
 import AsyncRattus
 
-newtype HasTicked = HasTicked Bool deriving Show
+newtype HasTick = HasTick Bool deriving Show
 
 data Value a where
-  Current :: !HasTicked -> !(List a) -> Value a
+  Current :: !HasTick -> !(List a) -> Value a
 
 instance Stable (Value a) where 
 instance Num a => Num (Value a) where
@@ -42,7 +42,7 @@ instance Eq a => Eq (Value a) where
   v1 == v2 = current v1 == current v2
 
 pureVal :: a -> Value a
-pureVal x = Current (HasTicked False) (x :! Nil)
+pureVal x = Current (HasTick False) (x :! Nil)
 
 current :: Value a -> a
 current (Current _ (h :! _)) = h

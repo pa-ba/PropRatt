@@ -17,9 +17,9 @@ import AsyncRattus.Plugin.Annotation
 
 {-# ANN module AllowLazyData #-}
 
-{-# ANN everySecondSig AllowRecursion #-}
-everySecondSig :: O (Sig ())
-everySecondSig = Delay (IntSet.fromList [2]) (\_ -> () ::: everySecondSig)
+{-# ANN everySig2Sig AllowRecursion #-}
+everySig2Sig :: O (Sig ())
+everySig2Sig = Delay (IntSet.fromList [2]) (\_ -> () ::: everySig2Sig)
 
 nats :: O (Sig ()) -> (Int :* Int) -> Sig (Int :* Int)
 nats later (n :* max) = stop
@@ -38,15 +38,15 @@ timerState (_ ::: rr) sliderSig@(_ ::: ss) =
             currentMax  = current sliderSig
             setMaxSig   = mapAwait (box setMax) ss
             inputSig    = interleave (box (.)) resetSig setMaxSig
-            inputSig'   = mapAwait (box ((nats everySecondSig) .)) inputSig
-            counterSig  = switchR ((nats everySecondSig) (0 :* currentMax)) inputSig'
+            inputSig'   = mapAwait (box ((nats everySig2Sig) .)) inputSig
+            counterSig  = switchR ((nats everySig2Sig) (0 :* currentMax)) inputSig'
     in counterSig
 
 prop_counterSigAlwaysLessThanMax :: Property
 prop_counterSigAlwaysLessThanMax = forAll genDouble $ \(reset, slider) ->
         let counterSig  = timerState reset slider
             state       = prepend counterSig $ prepend reset $ singletonH slider
-            predicate   = Always $ Now ((fst' <$> Index First) |<=| (snd' <$> Index First))
+            predicate   = G $ Now ((fst' <$> Idx Sig1) |<=| (snd' <$> Idx Sig1))
             result      = evaluate predicate state
         in counterexample (show state) result
   where
@@ -59,7 +59,7 @@ prop_maxAlwaysEqualsMax :: Property
 prop_maxAlwaysEqualsMax = forAll genDouble $ \(reset, slider) ->
         let counterSig  = timerState reset slider
             state       = prepend counterSig $ prepend reset $ singletonH slider
-            predicate   = Always $ Now ((Index Third) |==| (snd' <$> Index First))
+            predicate   = G $ Now ((Idx Sig3) |==| (snd' <$> Idx Sig1))
             result      = evaluate predicate state
         in counterexample (show state) result
   where
@@ -73,11 +73,11 @@ prop_concurrentResetAndSlider :: Property
 prop_concurrentResetAndSlider = forAll genDouble $ \(reset, slider) ->
         let counterSig  = timerState reset slider
             state       = prepend counterSig $ prepend reset $ singletonH slider
-            predicate   = Always $ Implies
-                (And (Now ((Ticked Second))) (Now ((Ticked Third))))
-                ((Now (((Index Third)) |==| (snd' <$> Index First)))
+            predicate   = G $ 
+                ((And (Now ((Tick Sig2))) (Now ((Tick Sig3)))) :=>
+                ((Now (((Idx Sig3)) |==| (snd' <$> Idx Sig1)))
                 `And`
-                (Now ((Pure 0) |==| (fst' <$> Index First))))
+                (Now ((Pure 0) |==| (fst' <$> Idx Sig1)))))
             result      = evaluate predicate state
         in counterexample (show state) result
   where
@@ -90,10 +90,9 @@ prop_timerIsStrictlyMonotonicallyIncreasing :: Property
 prop_timerIsStrictlyMonotonicallyIncreasing = forAll genDouble $ \(reset, slider) ->
         let counterSig  = timerState reset slider
             state       = prepend counterSig $ prepend reset $ singletonH slider
-            predicate   = Always $ Next $
-                Implies
-                ((Now (Ticked First)) `And` ((Not (Now (Ticked Second)) `And` (Not (Now (Ticked Third))))))
-                (Now (((fst' <$> (Index First)) |>| (fst' <$> (Index (Previous First))))))
+            predicate   = G $ X $
+                (((Now (Tick Sig1)) `And` ((Not (Now (Tick Sig2)) `And` (Not (Now (Tick Sig3)))))) :=>
+                (Now (((fst' <$> (Idx Sig1)) |>| (fst' <$> (Idx (Prev Sig1)))))))
             result      = evaluate predicate state
         in counterexample (show state) result
   where
@@ -107,7 +106,7 @@ prop_init :: Property
 prop_init = forAll genDouble $ \(reset, slider) ->
         let counterSig  = timerState reset slider
             state       = prepend counterSig $ prepend reset $ singletonH slider
-            predicate   = Now ((fst' <$> (Index First)) |==| (Pure 0)) `And` (Now ((snd' <$> (Index First)) |==| (Index Third)))
+            predicate   = Now ((fst' <$> (Idx Sig1)) |==| (Pure 0)) `And` (Now ((snd' <$> (Idx Sig1)) |==| (Idx Sig3)))
             result      = evaluate predicate state
         in counterexample (show state) result
   where
@@ -121,12 +120,12 @@ prop_counterSigStaysAtMaxValue :: Property
 prop_counterSigStaysAtMaxValue = forAllShrink genDouble shrink $ \(reset, slider) ->
         let counterSig  = timerState reset slider
             state       = prepend counterSig $ prepend reset $ singletonH slider
-            predicate   = Always $
-                Implies
-                    (Now ((fst' <$> (Index First)) |==| (snd' <$> (Index First))))
-                    (Next $ (Now ((fst' <$> (Index First)) |==| (fst' <$> (Index (Previous First))))
-                    `Until`
-                    ((Now (Ticked Second)) `Or` (Now (Ticked Third)))))
+            predicate   = G $
+                
+                    ((Now ((fst' <$> (Idx Sig1)) |==| (snd' <$> (Idx Sig1)))) :=>
+                    (X $ (Now ((fst' <$> (Idx Sig1)) |==| (fst' <$> (Idx (Prev Sig1)))))
+                    `U`
+                    ((Now (Tick Sig2)) `Or` (Now (Tick Sig3)))))
             result      = evaluate predicate state
         in counterexample (show state) result
   where
@@ -139,7 +138,7 @@ prop_counterSigAlwaysTicks :: Property
 prop_counterSigAlwaysTicks = forAll genDouble $ \(reset, slider) ->
         let counterSig  = timerState reset slider
             state       = prepend counterSig $ prepend reset $ singletonH slider
-            predicate   = Always $ Now (Ticked First) `And` (Next $ Now (Ticked First))
+            predicate   = G $ Now (Tick Sig1) `And` (X $ Now (Tick Sig1))
             result      = evaluate predicate state
         in counterexample (show state) result
   where

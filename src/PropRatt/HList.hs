@@ -27,11 +27,11 @@ infixr 5 %:
 
 instance Show (HList '[]) where
   show :: HList '[] -> String
-  show HNil = "HNil"
+  show HNil = "\n"
 
 instance (Show x, (Show (HList xs))) => Show (HList (x ': xs)) where
   show :: (Show x, Show (HList xs)) => HList (x : xs) -> String
-  show (HCons x xs) = show x ++ " %: " ++ show xs
+  show (HCons x xs) = show x ++ "; " ++ show xs
 
 instance Stable (HList '[]) where
 instance (Stable a, Stable (HList as)) => Stable (HList (a ': as)) where

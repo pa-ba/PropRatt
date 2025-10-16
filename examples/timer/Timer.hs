@@ -23,7 +23,7 @@ everySig2Sig' 0 = never
 everySig2Sig' n = Delay (IntSet.fromList [2]) (\_ -> () ::: everySig2Sig' (n-1))
 
 everySig2Sig :: O (Sig ())
-everySig2Sig = everySig2Sig' 20
+everySig2Sig = everySig2Sig' 100
 
 
 nats :: O (Sig ()) -> (Int :* Int) -> Sig (Int :* Int)
@@ -155,7 +155,7 @@ prop_counterSigAlwaysTicks = forAll genDouble $ \(reset, slider) ->
 
 -- the timer is constant unless a second passes or reset is pressed
 prop_timerConst :: Property
-prop_timerConst = forAll genDouble $ \(reset, slider) ->
+prop_timerConst = forAllShrink genDouble shrink $ \(reset, slider) ->
         let counterSig  = timerState reset slider
             state       = prepend counterSig $ prepend reset $ prepend slider $ singletonH (() ::: everySig2Sig)
             predicate   = G (X ((Not tick2 `And` Not tick4) :=> ((fst' <$> prev sig1) |==| (fst' <$> sig1))))
@@ -164,7 +164,7 @@ prop_timerConst = forAll genDouble $ \(reset, slider) ->
   where
     genDouble = do
       slider <- (arbitrarySigWith 100 (chooseInt (0, 100)) :: Gen (Sig Int))
-      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig ()))
       return (reset, slider)
 
 main :: IO ()

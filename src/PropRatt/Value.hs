@@ -12,7 +12,11 @@ import AsyncRattus.Signal hiding (current)
 import PropRatt.Utils
 import AsyncRattus
 
-newtype HasTick = HasTick Bool deriving Show
+newtype HasTick = HasTick Bool
+
+instance Show HasTick where
+  show (HasTick True) = "!"
+  show (HasTick False) = "_"
 
 data Value a where
   Current :: !HasTick -> !(List a) -> Value a
@@ -29,8 +33,7 @@ instance Num a => Num (Value a) where
 
 instance Show a => Show (Value a) where
   show (Current t Nil) = show t
-  show (Current _ (h :! Nil)) = show h
-  show (Current _ (h :! h2 :! _)) =  show h ++ " " ++ show h2
+  show (Current t (h :! _)) = show t ++ show h
 
 instance Show a => Show (Sig [Value a]) where
   show sig = "Sig [Value a]: " ++ show (toListOfLength 100 sig) ++ "..."

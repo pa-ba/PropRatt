@@ -89,7 +89,7 @@ prop_switchedSignal :: Property
 prop_switchedSignal = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let switched    = switch (first intSignals) (future (second intSignals))
         state       = prepend switched $ flatten intSignals
-        predicate   = (sig1 |==| sig2) `U` (sig1 |==| sig3)
+        predicate   = (sig1 |==| sig2) `U` (tick3 `And` G(sig1 |==| sig3))
         result      = evaluate predicate state
     in result
 

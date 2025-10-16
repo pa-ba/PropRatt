@@ -19,8 +19,8 @@ module PropRatt.LTL
     (|>|),
     (|>=|),
     (|==|),
-    tick1,tick2,tick3,
-    sig1,sig2,sig3,
+    tick1,tick2,tick3,tick4,
+    sig1,sig2,sig3,sig4,
     prev, prevN
   )
 where
@@ -118,6 +118,9 @@ tick2 = Now (Tick Sig2)
 tick3 :: Pred (t1 ': t2 ': Value t3 ': ts)
 tick3 = Now (Tick Sig3)
 
+tick4 :: Pred (t1 ': t2 ': t3 ': Value t4 ': ts)
+tick4 = Now (Tick Sig4)
+
 
 sig1 :: Expr (Value t ': ts) t
 sig1 = Idx Sig1
@@ -127,6 +130,9 @@ sig2 = Idx Sig2
 
 sig3 :: Expr (t1 ': t2 ': Value t3 ': ts) t3
 sig3 = Idx Sig3
+
+sig4 :: Expr (t1 ': t2 ': t3 ': Value t4 ': ts) t4
+sig4 = Idx Sig4
 
 prev :: Expr ts t -> Expr ts t
 prev (Pure x)   = Pure x

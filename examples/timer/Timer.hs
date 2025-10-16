@@ -17,9 +17,14 @@ import AsyncRattus.Plugin.Annotation
 
 {-# ANN module AllowLazyData #-}
 
-{-# ANN everySig2Sig AllowRecursion #-}
+{-# ANN everySig2Sig' AllowRecursion #-}
+everySig2Sig' :: Int -> O (Sig ())
+everySig2Sig' 0 = never
+everySig2Sig' n = Delay (IntSet.fromList [2]) (\_ -> () ::: everySig2Sig' (n-1))
+
 everySig2Sig :: O (Sig ())
-everySig2Sig = Delay (IntSet.fromList [2]) (\_ -> () ::: everySig2Sig)
+everySig2Sig = everySig2Sig' 20
+
 
 nats :: O (Sig ()) -> (Int :* Int) -> Sig (Int :* Int)
 nats later (n :* max) = stop
@@ -146,6 +151,22 @@ prop_counterSigAlwaysTicks = forAll genDouble $ \(reset, slider) ->
       reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
       return (reset, slider)
 
+
+
+-- the timer is constant unless a second passes or reset is pressed
+prop_timerConst :: Property
+prop_timerConst = forAll genDouble $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ prepend slider $ singletonH (() ::: everySig2Sig)
+            predicate   = G (X ((Not tick2 `And` Not tick4) :=> ((fst' <$> prev sig1) |==| (fst' <$> sig1))))
+            result      = evaluate predicate state
+        in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0, 100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      return (reset, slider)
+
 main :: IO ()
 main = do
     quickCheck prop_counterSigAlwaysLessThanMax
@@ -155,3 +176,4 @@ main = do
     quickCheck prop_init
     quickCheck prop_counterSigStaysAtMaxValue
     quickCheck prop_counterSigAlwaysTicks
+    quickCheck prop_timerConst

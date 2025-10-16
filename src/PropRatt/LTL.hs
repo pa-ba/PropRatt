@@ -19,6 +19,9 @@ module PropRatt.LTL
     (|>|),
     (|>=|),
     (|==|),
+    tick1,tick2,tick3,
+    sig1,sig2,sig3,
+    prev, prevN
   )
 where
 
@@ -95,16 +98,47 @@ instance Num t => Num (Expr ts t) where
   fromInteger :: Integer -> Expr ts t
   fromInteger n = pure (fromInteger n)
 
-(|<|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
-x |<| y = (<) <$> x <*> y
-(|<=|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
-x |<=| y = (<=) <$> x <*> y
-(|>|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
-x |>| y = (>) <$> x <*> y
-(|>=|) :: (Applicative f, Ord t) => f t -> f t -> f Bool
-x |>=| y = (>=) <$> x <*> y
-(|==|) :: (Applicative f, Eq t) => f t -> f t -> f Bool
-x |==| y = (==) <$> x <*> y
+(|<|) :: Ord t => Expr ts t -> Expr ts t -> Pred ts
+x |<| y = Now ((<) <$> x <*> y)
+(|<=|) :: Ord t => Expr ts t -> Expr ts t -> Pred ts
+x |<=| y = Now ((<=) <$> x <*> y)
+(|>|) :: Ord t => Expr ts t -> Expr ts t -> Pred ts
+x |>| y = Now ((>) <$> x <*> y)
+(|>=|) :: Ord t => Expr ts t -> Expr ts t -> Pred ts
+x |>=| y = Now ((>=) <$> x <*> y)
+(|==|) :: Ord t => Expr ts t -> Expr ts t -> Pred ts
+x |==| y = Now ((==) <$> x <*> y)
+
+tick1 :: Pred (Value t ': ts)
+tick1 = Now (Tick Sig1)
+
+tick2 :: Pred (t1 ': Value t2 ': ts)
+tick2 = Now (Tick Sig2)
+
+tick3 :: Pred (t1 ': t2 ': Value t3 ': ts)
+tick3 = Now (Tick Sig3)
+
+
+sig1 :: Expr (Value t ': ts) t
+sig1 = Idx Sig1
+
+sig2 :: Expr (t1 ': Value t2 ': ts) t2
+sig2 = Idx Sig2
+
+sig3 :: Expr (t1 ': t2 ': Value t3 ': ts) t3
+sig3 = Idx Sig3
+
+prev :: Expr ts t -> Expr ts t
+prev (Pure x)   = Pure x
+prev (App f x)  = App (prev f) (prev x)
+prev (Idx lu)   = Idx (Prev lu)
+prev (Tick lu)  = Tick (Prev lu)
+
+prevN :: Int -> Expr ts t -> Expr ts t
+prevN _ (Pure x)   = Pure x
+prevN n (App f x)  = App (prevN n f) (prevN n x)
+prevN n (Idx lu)   = Idx (PrevN n lu)
+prevN n (Tick lu)  = Tick (PrevN n lu)
 
 -- | Checks whether the instances of "previous" is within scope of t "X" operator.
 -- This prevents the evaluation from looking too far back in time.

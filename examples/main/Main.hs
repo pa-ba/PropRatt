@@ -47,11 +47,11 @@ prop_interleave :: Property
 prop_interleave = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let interleaved     = interleave (box (+)) (future $ first intSignals) (future $ second intSignals)
         state           = prependLater interleaved $ flatten intSignals
-        predicate       = X $ G $ ((Now ((Idx Sig1) |==| (Idx Sig2)))
+        predicate       = X $ G $ ((sig1 |==| sig2)
                                         `Or`
-                                        (Now ((Idx Sig1) |==| (Idx Sig3))))
+                                        (sig1 |==| sig3))
                                         `Or`
-                                        (Now (((Idx Sig2) + (Idx Sig3)) |==| (Idx Sig1)))
+                                        ((sig2 + sig3) |==| sig1)
         result          = evaluate predicate state
     in result
 
@@ -61,10 +61,7 @@ prop_jump = forAll (generateSignals @Int) $ \intSignals ->
    let  jumpFunc    = box (\n -> if n > 10 then Just' (const 1) else Nothing')
         jumpSig     = jump jumpFunc (first intSignals)
         state       = prepend jumpSig $ flatten intSignals
-        predicate   = G $
-                        Now ((Idx Sig1) |==| (Idx Sig2))
-                        `Or`
-                        Now ((Idx Sig1) |==| (Pure 1)) --
+        predicate   = G $ (sig1 |==| sig2) `Or` (sig1 |==| pure 1)
         result      = evaluate predicate state
     in result
 
@@ -73,7 +70,7 @@ prop_scan_failing :: Property
 prop_scan_failing =  forAllShrink (generateSignals @Int) shrinkHls $ \intSignals ->
     let prefixSum   = scan (box (+)) 0 (first intSignals)
         state       = prepend prefixSum $ flatten intSignals
-        predicate   = X $ G $ Now $ Idx (Prev Sig1) |<| (Idx Sig1)
+        predicate   = X $ G $ prev sig1 |<| sig1
         result      = evaluate predicate state
     in counterexample ("Must be natural numbers.") result
 
@@ -83,7 +80,7 @@ prop_scan =  forAllShrink (generateSignals @Int) shrinkHls $ \intSignals ->
     let absSig      = map (box (\x -> (abs x + 1))) (first intSignals)
         prefixSum   = scan (box (+)) 0 absSig
         state       = prepend prefixSum $ flatten intSignals
-        predicate   = X $ G $ Now $ Idx (Prev Sig1) |<| (Idx Sig1)
+        predicate   = X $ G $ prev sig1 |<| sig1
         result      = evaluate predicate state
     in result
 
@@ -92,7 +89,7 @@ prop_switchedSignal :: Property
 prop_switchedSignal = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let switched    = switch (first intSignals) (future (second intSignals))
         state       = prepend switched $ flatten intSignals
-        predicate   = U (Now ((Idx Sig1) |==| (Idx Sig2))) (Now ((Idx Sig1) |==| (Idx Sig3)))
+        predicate   = (sig1 |==| sig2) `U` (sig1 |==| sig3)
         result      = evaluate predicate state
     in result
 
@@ -101,7 +98,7 @@ prop_buffer :: Property
 prop_buffer = forAll (generateSignals @Int) $ \intSignals ->
     let bufferedSig = buffer 10 (first intSignals)
         state       = prepend bufferedSig $ flatten intSignals
-        predicate   = X $ G $ Now $ (Idx Sig1) |==| Idx (Prev Sig2)
+        predicate   = X $ G $ sig1 |==| prev sig2
         result      = evaluate predicate state
     in result
 
@@ -110,7 +107,7 @@ prop_stop :: Property
 prop_stop = forAll (generateSignals @Int) $ \intSignals ->
     let stopped     = stop (box (>100)) (first intSignals)
         state       = prepend stopped $ flatten intSignals
-        predicate   = G ((Now ((Idx Sig1) |>| (Pure 100))) :=> (G $ X (Now (Idx (Prev Sig1) |==| (Idx Sig1)))))
+        predicate   = G ((sig1 |>| pure 100) :=> (G $ X (prev sig1 |==| sig1)))
         result      = evaluate predicate state
     in result
 
@@ -119,7 +116,7 @@ prop_zip :: Property
 prop_zip = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let s1          = zip (first intSignals) (second intSignals)
         state       = prepend s1 $ flatten intSignals
-        predicate   = G $ Now ((fst' <$> (Idx Sig1)) |==| (Idx Sig2)) `And` (Now ((snd' <$> (Idx Sig1)) |==| (Idx Sig3)))
+        predicate   = G $ ((fst' <$> sig1) |==| sig2) `And` ((snd' <$> sig1) |==| sig3)
         result      = evaluate predicate state
     in result
 
@@ -128,9 +125,9 @@ prop_filter = forAll (generateSignals @Int) $ \intSignals ->
   let filtered      = filterM (box (>= 10)) (first intSignals)
       state         = prepend filtered $ flatten intSignals
       predicate     = G $
-            ((Now ((Idx Sig2) |>=| Pure (10))) :=> (Now ((Idx Sig1) |>=| (Pure (Just' 10)))))
+            ((sig2 |>=| pure 10) :=> (sig1 |>=| pure (Just' 10)))
             `And`
-            ((Now ((Idx Sig2) |<| Pure (10))) :=> (Now ((Idx Sig1) |==| (Pure Nothing'))))
+            (sig2 |<| pure 10) :=> (sig1 |==| pure Nothing')
       result        = evaluate predicate state
   in result
 
@@ -139,8 +136,8 @@ prop_triggerM = forAll (generateSignals @[Int, Int]) $ \intSignals ->
   let triggered     = triggerM (box (*)) (first intSignals) (second intSignals)
       state         = prepend triggered $ flatten intSignals
       predicate     = G 
-            ((Now ((Tick Sig2) |==| (Pure True))) :=> 
-            ((Now ((Tick Sig1) |==| (Pure True))) `And` (Now ((fromMaybe' 0 <$> (Idx Sig1)) |==| ((Idx Sig2) * (Idx Sig3))))))
+            tick2 :=> 
+            (tick1 `And` ((fromMaybe' 0 <$> sig1) |==| (sig2 * sig3)))
       result        = evaluate predicate state
   in result
 
@@ -148,10 +145,7 @@ prop_parallel :: Property
 prop_parallel = forAllShrink (generateSignals @[Int, Int]) shrinkHls $ \intSignals ->
     let paralleled  = parallel (first intSignals) (second intSignals)
         state       = prepend paralleled $ flatten intSignals
-        predicate   = G $
-            (Now (Tick Sig3) :=> Now (Tick Sig1))
-            `And`
-            (Now (Tick Sig2) :=> Now (Tick Sig1))
+        predicate   = G $ (tick3 :=> tick1) `And`(tick2 :=> tick1)
         result      = evaluate predicate state
     in result
 
@@ -160,9 +154,9 @@ prop_isStuttering = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let stuttered   = stutter (first intSignals) (second intSignals)
         state       = prepend stuttered $ flatten intSignals
         predicate   = G $
-            (Now (Tick Sig1) :=> Now (Idx Sig1 |==| Idx Sig2))
+            (tick1 :=> (sig1 |==| sig2))
             `And`
-            X ((And (Now (Tick Sig3)) (Not (Now (Tick Sig2))) :=> Now (Idx (Prev Sig1) |==| Idx Sig1)))
+            X ((tick3 `And` Not (tick2)) :=> (prev sig1 |==| sig1))
         result      = evaluate predicate state
     in result
 
@@ -170,14 +164,14 @@ prop_functionIsMonotonic :: Property
 prop_functionIsMonotonic = forAll (generateSignals @Int) $ \intSignals ->
     let mono        = monotonic (first intSignals)
         state       = singletonH mono
-        predicate   = G $ X (Now ((Idx Sig1) |>=| (Idx (Prev Sig1))))
+        predicate   = G $ X (sig1 |>=| prev sig1)
         result      = evaluate predicate state
     in result
 
 prop_singleSignalAlwaysTicks :: Property
 prop_singleSignalAlwaysTicks = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \sig ->
     let state       = singletonH sig
-        predicate   = G $ Now ((Tick Sig1) |==| (Pure True))
+        predicate   = G tick1
         result      = evaluate predicate state
     in result
 
@@ -188,14 +182,11 @@ prop_switchR = forAllShrink (generateSignals @Int) shrinkHls $ \intSignals ->
         (_ ::: ys)          = (scan (box (\n _ -> n + 1)) 0 (takeN (sigLength xs) mkSigZero)) :: Sig Int
         zs                  = switchR xs (mapAwait (box (\b _ -> const b)) ys)
         state               = prepend zs $ prependLater ys $ flatten intSignals
-        predicate           = (Now ((Idx Sig1) |==| (Idx Sig3)))
-                                `U`
-                                (Now ((Tick Sig2) |==| (Pure True)))
+        predicate           = ((sig1 |==| sig3) `U`tick2)
                                 `And` 
-                                ((G $ X 
-                                    ((((Not (Now (Tick Sig2)) :=> Now ((Idx (Prev Sig1)) |==| (Idx Sig1))))))))
+                                (G $ X (Not tick2 :=> (prev sig1 |==| sig1)))
                                 `U`
-                               (X $ ((Now (Tick Sig2) :=> Not (Now ((Idx (Prev Sig1)) |==| (Idx Sig1))))))
+                                 (X (tick2 :=> Not (prev sig1 |==| sig1)))
         result              = evaluate predicate state
     in counterexample (show state) result
 
@@ -206,21 +197,19 @@ prop_switchS = forAllShrink (generateSignals @Int) shrinkHls $ \intSignals ->
         ggg                 = Delay (IntSet.fromList [1,2,3]) (\_ a -> const a)
         zs                  = switchS xs ggg
         state               = prepend zs $ prependLater ys $ flatten intSignals
-        predicate           =(Now ((Idx Sig1) |==| (Idx Sig3)))
+        predicate           =(sig1 |==| sig3)
                                 `U`
-                                (Now ((Tick Sig2) |==| (Pure True)))
+                                tick2
                                 `And` 
-                                ((G $ X 
-                                    ((((Not (Now (Tick Sig2)) :=> Now ((Idx (Prev Sig1)) |==| (Idx Sig1))))))))
-                                `U`
-                               (X $ ((Now (Tick Sig2) :=> Not (Now ((Idx (Prev Sig1)) |==| (Idx Sig1))))))
+                                (G $ X (Not tick2 :=> (prev sig1 |==| sig1)))
+                                `U`(X (tick2 :=> Not (prev sig1 |==| sig1)))
         result              = evaluate predicate state
     in counterexample (show gg ++ show zs ++ show xs) result
 
 prop_sigLength :: Property
 prop_sigLength = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
         let state       = singletonH (sig :: Sig Int)
-            predicate   = G $ (Now ((Idx Sig1) |<| (Pure 50)))
+            predicate   = G (sig1 |<| pure 50)
             result      = evaluate predicate state
         in result
 
@@ -228,14 +217,14 @@ prop_sigIsPositive :: Property
 prop_sigIsPositive = forAll (generateSignals @Int) $ \sig ->
         let mapped      = map (box (abs)) (first sig)
             state       = singletonH mapped
-            predicate   = X $ G $ Now ((Idx (PrevN 1 Sig1)) |>=| (Pure 0))
+            predicate   = X $ G (prevN 1 sig1 |>=| pure 0)
             result      = evaluate predicate state 
         in result
 
 prop_catchsubtle :: Property
 prop_catchsubtle = forAllShrink (arbitrary :: Gen (Sig Int)) shrink $ \(sig :: Sig Int) ->
         let state       = singletonH (sig :: Sig Int)
-            predicate   = G ((Now ((Idx Sig1) |>| (Pure 80))) :=> (X $ (Now ((Idx Sig1) |<| (Idx (Prev Sig1))))))
+            predicate   = G ((sig1 |>| pure 80) :=> X (sig1 |<| (prev sig1)))
             result      = evaluate predicate state
         in result
 
@@ -243,7 +232,7 @@ prop_predLengthOutsideDefault :: Property
 prop_predLengthOutsideDefault =  forAllShrink (generateSignals @Int) shrinkHls $ \intSignals ->
     let prefixSum   = scan (box (+)) 0 (first intSignals)
         state       = prepend prefixSum $ flatten intSignals
-        predicate   = XN 100 $ G $ Now $ Idx (Prev Sig1) |<| (Idx Sig1)
+        predicate   = XN 100 $ G (prev sig1 |<| sig1)
         result      = evaluate predicate state
     in result
 

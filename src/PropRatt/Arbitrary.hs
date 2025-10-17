@@ -191,7 +191,7 @@ instance (Arbitrary (Sig t), HListGen ts) => HListGen (t ': ts) where
   generateHList = do
     x <- arbitrary
     xs <- generateHList @ts
-    return (x %: xs)
+    return (x :% xs)
 
 generateSignals :: forall a. HListGen (ToList a) => Gen (HList (Map Sig (ToList a)))
 generateSignals = generateHList @(ToList a)
@@ -203,7 +203,7 @@ instance ShrinkHList '[] where
   shrinkHls _ = []
 
 instance (Arbitrary a, ShrinkHList as) => ShrinkHList (a ': as) where
-  shrinkHls (HCons x xs) =
-    [ HCons x' xs | x'  <- shrink x ] ++
-    [ HCons x xs' | xs' <- shrinkHls xs ] ++
-    [ HCons x' xs' | x'  <- shrink x, xs' <- shrinkHls xs ]
+  shrinkHls (x :% xs) =
+    [ x' :% xs | x'  <- shrink x ] ++
+    [ x :% xs' | xs' <- shrinkHls xs ] ++
+    [ x' :% xs' | x'  <- shrink x, xs' <- shrinkHls xs ]

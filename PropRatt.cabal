@@ -9,9 +9,9 @@ description:
                 a means to express properties of several concurrent signals. This
                 allows users to express temporal properties that relate data coming from
                 different signals at different points in time.
-author:         Christian Emil Nielsen, Mathias Faber Kristiansen, Patrick Bahr
-maintainer:     paba@itu.dk
-copyright:      2025 Christian Emil Nielsen, Mathias Faber Kristiansen, Patrick Bahr
+author:         Anonymous authors
+maintainer:     Anonymous authors
+copyright:      2025 Anonymous authors
 license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple

@@ -111,11 +111,7 @@ genClock = do
     1 -> do
       x <- chooseInt (1,3)
       return (IntSet.fromList [x])
-    2 -> frequency
-      [ (1, return (IntSet.fromList [1,2]))
-      , (1, return (IntSet.fromList [2,3]))
-      , (1, return (IntSet.fromList [1,3]))
-      ]
+    2 -> elements $ map IntSet.fromList [[1,2], [2,3], [1,3]]
     3 -> return (IntSet.fromList [1,2,3])
     _ -> error "genClock: impossible!"
 

@@ -4,10 +4,11 @@ PropRatt is a Haskell framework for testing AsyncRattus using property-based tes
 
 # Overview
 
+- The [main example file](examples/main/Main.hs) contains example
+  specifications that test signal combinators of the Async Rattus
+  library.
 - The [timer example file](examples/timer/Timer.hs) contains the timer
   example from the paper.
-- The [main example file](examples/main/Main.hs) contains further
-  example specifications that test several signal combinators.
 - The implementation of the specification language can be found in the
   [PropRatt.LTL](src/PropRatt/LTL.hs) module.
 

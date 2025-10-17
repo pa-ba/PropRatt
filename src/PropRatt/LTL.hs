@@ -52,7 +52,7 @@ data Pred (ts :: [Type]) where
 data Expr (ts :: [Type]) (t :: Type) where
   Pure  :: t -> Expr ts t
   App   :: Expr ts (t -> r) -> Expr ts t -> Expr ts r
-  Idx   :: Lookup ts t -> Expr ts t
+  Val   :: Lookup ts t -> Expr ts t
   Tick  :: Lookup ts t -> Expr ts Bool
 
 data Lookup (ts :: [Type]) (t :: Type) where
@@ -72,7 +72,7 @@ instance Functor (Expr ts) where
   fmap :: (t -> r) -> Expr ts t -> Expr ts r
   fmap f (Pure x)     = Pure (f x)
   fmap f (App g x)  = App (fmap (f .) g) x
-  fmap f (Idx lu)   = App (Pure f) (Idx lu)
+  fmap f (Val lu)   = App (Pure f) (Val lu)
   fmap f (Tick lu)  = App (Pure f) (Tick lu)
 
 instance Applicative (Expr ts) where
@@ -123,27 +123,27 @@ tick4 = Now (Tick Sig4)
 
 
 sig1 :: Expr (Value t ': ts) t
-sig1 = Idx Sig1
+sig1 = Val Sig1
 
 sig2 :: Expr (t1 ': Value t2 ': ts) t2
-sig2 = Idx Sig2
+sig2 = Val Sig2
 
 sig3 :: Expr (t1 ': t2 ': Value t3 ': ts) t3
-sig3 = Idx Sig3
+sig3 = Val Sig3
 
 sig4 :: Expr (t1 ': t2 ': t3 ': Value t4 ': ts) t4
-sig4 = Idx Sig4
+sig4 = Val Sig4
 
 prev :: Expr ts t -> Expr ts t
 prev (Pure x)   = Pure x
 prev (App f x)  = App (prev f) (prev x)
-prev (Idx lu)   = Idx (Prev lu)
+prev (Val lu)   = Val (Prev lu)
 prev (Tick lu)  = Tick (Prev lu)
 
 prevN :: Int -> Expr ts t -> Expr ts t
 prevN _ (Pure x)   = Pure x
 prevN n (App f x)  = App (prevN n f) (prevN n x)
-prevN n (Idx lu)   = Idx (PrevN n lu)
+prevN n (Val lu)   = Val (PrevN n lu)
 prevN n (Tick lu)  = Tick (PrevN n lu)
 
 -- | Checks whether the instances of "previous" is within scope of t "X" operator.
@@ -179,7 +179,7 @@ checkExpr expr scope =
   case expr of
     Pure _      -> scope
     App fun arg -> min (checkExpr fun scope) (checkExpr arg scope)
-    Idx lu      -> checkLookup lu scope
+    Val lu      -> checkLookup lu scope
     Tick lu     -> checkLookup lu scope
 
 checkLookup :: Lookup ts t -> Int -> Int
@@ -233,7 +233,7 @@ evalTick lu hls = case lu of
 evalExpr :: Expr ts t -> HList ts -> Expr ts t
 evalExpr (Pure x) _      = pure x
 evalExpr (App f x) hls = (($) <$> evalExpr f hls) <*> evalExpr x hls
-evalExpr (Idx lu) hls  =
+evalExpr (Val lu) hls  =
   case evalLookup lu hls of
     Just' (Current _ (h :! _)) -> pure h
     Just' (Current _ Nil)      -> error "History not found for signal."

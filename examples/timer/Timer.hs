@@ -91,6 +91,34 @@ prop_concurrentResetAndSlider = forAll genDouble $ \(reset, slider) ->
       reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
       return (reset, slider)
 
+
+
+prop_reset :: Property
+prop_reset = forAll genDouble $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ singletonH slider
+            predicate   = G (tick2 :=> (pure 0 |==| (fst' <$> sig1)))
+            result      = evaluate predicate state
+        in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0, 100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      return (reset, slider)
+
+prop_max :: Property
+prop_max = forAll genDouble $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ singletonH slider
+            predicate   = G (sig3 |==| (snd' <$> sig1))
+            result      = evaluate predicate state
+        in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0, 100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig (())))
+      return (reset, slider)
+
 prop_timerIsStrictlyMonotonicallyIncreasing :: Property
 prop_timerIsStrictlyMonotonicallyIncreasing = forAll genDouble $ \(reset, slider) ->
         let counterSig  = timerState reset slider
@@ -176,4 +204,6 @@ main = do
     quickCheck prop_init
     quickCheck prop_counterSigStaysAtMaxValue
     quickCheck prop_counterSigAlwaysTicks
+    quickCheck prop_reset
+    quickCheck prop_max
     quickCheck prop_timerConst

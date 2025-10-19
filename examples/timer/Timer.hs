@@ -195,6 +195,22 @@ prop_timerConst = forAllShrink genDouble shrink $ \(reset, slider) ->
       reset <- (arbitrarySigWeighted 100 :: Gen (Sig ()))
       return (reset, slider)
 
+
+
+-- the timer ticks unless it reached its maximum
+prop_timerTicks :: Property
+prop_timerTicks = forAllShrink genDouble shrink $ \(reset, slider) ->
+        let counterSig  = timerState reset slider
+            state       = prepend counterSig $ prepend reset $ prepend slider $ singletonH (() ::: everySig2Sig)
+            predicate   = G ( ((snd' <$> sig1) |<| sig3 `And` X tick4)  :=> X ((snd' <$> sig1) |==| ((+1) . snd' <$> prev sig1)))
+            result      = evaluate predicate state
+        in counterexample (show state) result
+  where
+    genDouble = do
+      slider <- (arbitrarySigWith 100 (chooseInt (0, 100)) :: Gen (Sig Int))
+      reset <- (arbitrarySigWeighted 100 :: Gen (Sig ()))
+      return (reset, slider)
+
 main :: IO ()
 main = do
     quickCheck prop_counterSigAlwaysLessThanMax
@@ -207,3 +223,4 @@ main = do
     quickCheck prop_reset
     quickCheck prop_max
     quickCheck prop_timerConst
+    quickCheck prop_timerTicks

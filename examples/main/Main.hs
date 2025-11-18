@@ -1,5 +1,5 @@
 {-# OPTIONS -fplugin=AsyncRattus.Plugin #-}
-{-# LANGUAGE TypeApplications, FlexibleInstances #-}
+{-# LANGUAGE TypeApplications, FlexibleInstances, TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -22,6 +22,13 @@ import PropRatt.Signal
 import qualified Data.IntSet as IntSet
 
 {-# ANN module AllowLazyData #-}
+
+zipWrong :: (Stable a, Stable b) => Sig a -> Sig b -> Sig (a :* b)
+zipWrong (a ::: as) (b ::: bs) = (a :* b) ::: delay (
+        case select as bs of
+        Fst (a' ::: as') bs' -> zipWrong (a' ::: as') (b ::: bs')
+        Snd as' (b' ::: bs') -> zipWrong (a ::: as') (b ::: bs')
+        Both as' bs' -> zipWrong as' bs')
 
 filterM :: Box (a -> Bool) -> Sig a -> Sig (Maybe' a)
 filterM f (x ::: xs) = if unbox f x
@@ -117,6 +124,14 @@ prop_zip = forAll (generateSignals @[Int, Int]) $ \intSignals ->
     let s1          = zip (first intSignals) (second intSignals)
         state       = prepend s1 $ flatten intSignals
         predicate   = G $ ((fst' <$> sig1) |==| sig2) `And` ((snd' <$> sig1) |==| sig3)
+        result      = evaluate predicate state
+    in result
+
+prop_zipWrong :: Property
+prop_zipWrong = forAllShrink (generateSignals @[Int, Int]) shrinkHls $ \intSignals ->
+    let s1          = zipWrong (first intSignals) (second intSignals)
+        state       = prepend s1 $ flatten intSignals
+        predicate   = G (tick3 :=> (sig3 |==| (snd' <$> sig1)))
         result      = evaluate predicate state
     in result
 
@@ -264,3 +279,5 @@ main = do
     quickCheck (withMaxSuccess 1000 prop_catchsubtle)
     putStrLn "====================="
     quickCheck prop_predLengthOutsideDefault
+    putStrLn "====================="
+    quickCheck prop_zipWrong

@@ -5,3 +5,4 @@ Main
 !Main.hs
 .vscode/
 dist-newstyle/
+stack.yaml.lock

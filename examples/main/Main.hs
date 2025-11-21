@@ -133,7 +133,7 @@ prop_zipWrong = forAllShrink (generateSignals @[Int, Int]) shrinkHls $ \intSigna
         state       = prepend s1 $ flatten intSignals
         predicate   = G (tick3 :=> (sig3 |==| (snd' <$> sig1)))
         result      = evaluate predicate state
-    in result
+    in counterexample (show state) result
 
 prop_filter :: Property
 prop_filter = forAll (generateSignals @Int) $ \intSignals ->

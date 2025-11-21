@@ -1,6 +1,6 @@
 cabal-version: 2.2
 name:           PropRatt
-version:        0.1.0.0
+version:        0.2.0.0
 synopsis:       Property-based testing framework for testing asynchronous FRP programs.
 category:       testing
 description:    
@@ -9,9 +9,11 @@ description:
                 a means to express properties of several concurrent signals. This
                 allows users to express temporal properties that relate data coming from
                 different signals at different points in time.
-author:         Anonymous authors
-maintainer:     Anonymous authors
-copyright:      2025 Anonymous authors
+
+                More details can be found in the <https://bahr.io/pubs/files/propratt-paper.pdf accompanying paper>.
+author:         Christian Emil Nielsen, Mathias Faber Kristiansen, Patrick Bahr
+maintainer:     paba@itu.dk
+copyright:      2025 Christian Emil Nielsen, Mathias Faber Kristiansen, Patrick Bahr
 license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple

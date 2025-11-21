@@ -4,13 +4,19 @@ version:        0.2.0.0
 synopsis:       Property-based testing framework for testing asynchronous FRP programs.
 category:       testing
 description:    
-                PropRatt is a property-based testing framework for testing Async Rattus programs.
+                PropRatt is a property-based testing framework for testing <https://hackage.haskell.org/package/AsyncRattus Async Rattus> programs.
                 The key component of PropRatt is its specification language, which extends basic linear temporal logic with
                 a means to express properties of several concurrent signals. This
                 allows users to express temporal properties that relate data coming from
                 different signals at different points in time.
-
-                More details can be found in the <https://bahr.io/pubs/files/propratt-paper.pdf accompanying paper>.
+                .
+                More details about the specification language can be found in the <https://bahr.io/pubs/files/propratt-paper.pdf accompanying paper>.
+                .
+                Example specifications written in PropRatt:
+                .
+                * <https://github.com/pa-ba/PropRatt/blob/main/examples/timer/Timer.hs Specification for a simple GUI application>
+                .
+                * <https://github.com/pa-ba/PropRatt/blob/main/examples/main/Main.hs Specification for basic signal combinators> (@map@, @zip@, @scan@, etc.)
 author:         Christian Emil Nielsen, Mathias Faber Kristiansen, Patrick Bahr
 maintainer:     paba@itu.dk
 copyright:      2025 Christian Emil Nielsen, Mathias Faber Kristiansen, Patrick Bahr

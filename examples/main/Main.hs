@@ -27,7 +27,7 @@ zipWrong :: (Stable a, Stable b) => Sig a -> Sig b -> Sig (a :* b)
 zipWrong (a ::: as) (b ::: bs) = (a :* b) ::: delay (
         case select as bs of
         Fst (a' ::: as') bs' -> zipWrong (a' ::: as') (b ::: bs')
-        Snd as' (b' ::: bs') -> zipWrong (a ::: as') (b ::: bs')
+        Snd as' (_b' ::: bs') -> zipWrong (a ::: as') (b ::: bs')
         Both as' bs' -> zipWrong as' bs')
 
 filterM :: Box (a -> Bool) -> Sig a -> Sig (Maybe' a)
@@ -274,9 +274,9 @@ main = do
     putStrLn "====================="
     quickCheck prop_sigLength
     putStrLn "====================="
-    quickCheck (withMaxSuccess 1000 prop_switchR)
+    quickCheck (withNumTests 1000 prop_switchR)
     putStrLn "====================="
-    quickCheck (withMaxSuccess 1000 prop_catchsubtle)
+    quickCheck (withNumTests 1000 prop_catchsubtle)
     putStrLn "====================="
     quickCheck prop_predLengthOutsideDefault
     putStrLn "====================="

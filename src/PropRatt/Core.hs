@@ -38,7 +38,7 @@ instance Flatten '[] '[] where
   flatten :: HList '[] -> Sig (HList '[])
   flatten HNil = emptySig
 
-instance (Stable a, Stable (Value a), Flatten as bs, Falsify bs) => Flatten (Sig a ': as) (Value a ': bs) where
+instance (Stable a, Flatten as bs, Falsify bs) => Flatten (Sig a ': as) (Value a ': bs) where
   flatten :: HList (Sig a : as) -> Sig (HList (Value a : bs))
   flatten (h :% t) = prepend h (flatten t)
 
